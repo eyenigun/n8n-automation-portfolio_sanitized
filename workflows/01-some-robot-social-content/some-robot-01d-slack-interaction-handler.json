@@ -1,0 +1,1515 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "SoMe Robot - 01d Slack Interaction Handler",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-interactions",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -7808,
+        3424
+      ],
+      "id": "2d70a048-61b8-46bd-9a8d-ba8a33f70042",
+      "name": "Webhook",
+      "webhookId": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -7568,
+        3424
+      ],
+      "id": "974cfe9f-e516-45c2-b765-91fd655d34b4",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nlet payload;\ntry {\n  payload = JSON.parse(body.payload || '{}');\n} catch (e) {\n  return [{ json: { valid: false, error: 'Could not parse payload', raw: body } }];\n}\n\nconst action = (payload.actions && payload.actions[0]) || {};\nconst blockId = action.block_id || '';\nconst actionId = action.action_id || '';\nconst selectedOptions = action.selected_options || [];\n\nconst topicMatch = blockId.match(/^topic_(\\d+)$/);\nconst draftMatch = blockId.match(/^draft_(\\d+)$/);\nconst publishMatch = blockId.match(/^publish_(\\d+)$/);\nconst linkedinMatch = blockId.match(/^linkedin_(\\d+)$/);\nconst topicId = topicMatch ? Number(topicMatch[1]) : (draftMatch ? Number(draftMatch[1]) : (publishMatch ? Number(publishMatch[1]) : (linkedinMatch ? Number(linkedinMatch[1]) : null)));\n\nconst validActionIds = ['approve_topic', 'approve_draft', 'regenerate_draft', 'approve_publish', 'regenerate_adaptation', 'mark_linkedin_published'];\n\nreturn [{\n  json: {\n    valid: Boolean(topicId && validActionIds.includes(actionId)),\n    actionId,\n    topicId,\n    approved: selectedOptions.length > 0,\n    user: payload.user ? payload.user.username : null\n  }\n}];"
+      },
+      "id": "76c5ed47-cd86-4fd3-a140-3736aadab74b",
+      "name": "Parse Slack Interaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7568,
+        3696
+      ],
+      "notes": "Parses the Slack block_actions payload (form-urlencoded 'payload' field) and extracts the topic id (from block_id) and whether it was checked or unchecked."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.approved ? 'Approved' : 'Shortlisted' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d317cd7d-1679-41a2-b62e-538734cf3adc",
+      "name": "Update Approval Status",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7136,
+        3424
+      ],
+      "notes": "Updates the matching data table row's status based on whether the checkbox was checked (Approved) or unchecked (back to Shortlisted)."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "accc2fdb-86a0-4a1b-bf97-6a108968735b",
+                    "leftValue": "={{ $json.actionId }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "approve_topic"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "approve_topic"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "89b9e248-648d-4cb8-899e-6d7cf5744c90",
+                    "leftValue": "={{ $json.actionId }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "approve_draft"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "approve_draft"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "1b9d7abd-73ac-4b27-b3b3-8f77c90809ed",
+                    "leftValue": "={{ $json.actionId }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "regenerate_draft"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "regenerate_draft"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "1bde0cfa-c702-4dbc-add2-d8a354ed4f06",
+                    "leftValue": "={{ $json.actionId }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "approve_publish"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "approve_publish"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "de13922f-7c2e-45be-9a3a-a1c17695f70a",
+                    "leftValue": "={{ $json.actionId }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "regenerate_adaptation"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "regenerate_adaptation"
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "7a1c9e3f-2b56-4f11-9c8e-1d3a5b6c7d8e",
+                    "leftValue": "={{ $json.actionId }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "mark_linkedin_published"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "mark_linkedin_published"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "fd8736ad-e960-44bf-8696-1b1a235b9ab9",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -7328,
+        3648
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Ready for Adaptation"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_url",
+              "displayName": "image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "6ad3777d-63f1-47c3-a686-a799d8dfd73b",
+      "name": "Update Draft Approved",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7056,
+        3584
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Approved"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_url",
+              "displayName": "image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b7a5f1f0-aec5-442d-bd0c-2f06dd7f990e",
+      "name": "Update Draft Regenerate",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7056,
+        3744
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Ready to Publish"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_url",
+              "displayName": "image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "a42bbfb7-9340-497b-9274-7816afc8c62f",
+      "name": "Update Publish Approved",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7040,
+        3920
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Ready for Adaptation"
+          }
+        },
+        "options": {}
+      },
+      "id": "86eedc90-3c45-45e6-b433-044cd4b55780",
+      "name": "Update Adaptation Regenerate",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7040,
+        4096
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Webhook at /webhook/slack-interactions receives Slack's block_actions payload the instant someone clicks a checkbox\nParses out the topic ID and checked/unchecked state\nWrites status: Approved (or back to Shortlisted if unchecked) directly to some_robot_content — no polling needed at all\n\n01d extended — now routes three action types via a Switch node: \napprove_topic (existing checkbox flow, unchanged) → Approved; \napprove_draft (new) → Ready for Adaptation; \nregenerate_draft (new) → back to Approved (re-enters 01e for a fresh draft)\nNew table some_robot_draft_review_state tracks the message for in-place updates",
+        "height": 256,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -7904,
+        3136
+      ],
+      "id": "a3c642d4-d679-4c83-a415-aff16d22c313",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "SoMe Robot - 01j Refresh Status Board"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "8da607d7-0400-4e3e-9288-23fb973e8138",
+      "name": "Refresh Status Board",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -6800,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "published_linkedin": true,
+            "status": "Published"
+          }
+        },
+        "options": {}
+      },
+      "id": "9c1e2d3f-4a5b-4c6d-8e7f-1a2b3c4d5e6f",
+      "name": "Update LinkedIn Published",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -7040,
+        4256
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "SoMe Robot - 01k LinkedIn Publish Reminder"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "b1c2d3e4-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Refresh LinkedIn Reminder",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -6800,
+        4256
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.actionId }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "mark_linkedin_published"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+      "name": "Is Mark LinkedIn Published?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -7456,
+        4256
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "Approved"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "d2e3f4a5-6b7c-4d8e-9f0a-1b2c3d4e5f6a",
+      "name": "Was Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -6896,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "SoMe Robot - 01e Draft Generation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "e3f4a5b6-7c8d-4e9f-0a1b-2c3d4e5f6a7b",
+      "name": "Trigger Draft Generation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -6656,
+        3312
+      ]
+    },
+    {
+      "id": "a2b3c4d5-6e7f-4890-a1b2-c3d4e5f6a7b8",
+      "name": "Trigger Platform Adaptation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -6750,
+        3584
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "SoMe Robot - 01g Platform Adaptation",
+          "mode": "list",
+          "value": "<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null
+        }
+      }
+    },
+    {
+      "id": "c5d6e7f8-9012-4a3b-8c4d-5e6f7a8b9c0d",
+      "name": "Trigger Publish to X",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -6750,
+        3920
+      ],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "SoMe Robot - 01i Publish to X",
+          "mode": "list",
+          "value": "<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": null
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Slack Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action": {
+      "main": [
+        [
+          {
+            "node": "Update Approval Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Draft Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Draft Regenerate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Publish Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Adaptation Regenerate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Approval Status": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Was Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Draft Approved": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trigger Platform Adaptation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Draft Regenerate": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Publish Approved": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trigger Publish to X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Adaptation Regenerate": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update LinkedIn Published": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Refresh LinkedIn Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Slack Interaction": {
+      "main": [
+        [
+          {
+            "node": "Is Mark LinkedIn Published?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route by Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Mark LinkedIn Published?": {
+      "main": [
+        [
+          {
+            "node": "Update LinkedIn Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was Approved?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Draft Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

@@ -1,0 +1,353 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "SoMe Robot - 01a Slack Idea Capture",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "input-idea",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b27056af-9c71-4093-aa59-42654dbddeb2",
+      "name": "Slash Command Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "notes": "Register /input_idea in your Slack app config, pointing its Request URL at this webhook's Production URL."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "topic",
+              "type": "string",
+              "value": "={{ $json.body.text }}"
+            },
+            {
+              "id": "a2",
+              "name": "source",
+              "type": "string",
+              "value": "slack"
+            },
+            {
+              "id": "a3",
+              "name": "status",
+              "type": "string",
+              "value": "New"
+            },
+            {
+              "id": "a4",
+              "name": "submitted_by",
+              "type": "string",
+              "value": "={{ $json.body.user_name }}"
+            },
+            {
+              "id": "a5",
+              "name": "created_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e8debc26-f387-4b4f-b8c6-23dbabbb1f20",
+      "name": "Parse Slack Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "notes": "Slack sends application/x-www-form-urlencoded. text = everything typed after /input_idea. Add a Slack signature-verification step here later if needed — skipped for MVP."
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "some_robot_content"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "target_linkedin": false,
+            "target_x": false,
+            "approved_linkedin": false,
+            "approved_x": false,
+            "published_linkedin": false,
+            "published_x": false,
+            "topic": "={{ $json.topic }}",
+            "source": "={{ $json.source }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ea48b5f2-75e9-42f0-8e66-b5ecca9bc05d",
+      "name": "Insert Idea Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "notes": "Auto-maps topic/source/status/submitted_by/created_at fields from the previous node onto the matching columns in some_robot_content. Only topic/source/status/created_at are in the core schema — add a submitted_by column if you want to keep that field, or drop it from the Set node above."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response_type\": \"ephemeral\", \"text\": \"Got it - added to the idea list.\" } }}",
+        "options": {}
+      },
+      "id": "807626f2-b8cb-4a73-aaea-532c093a7dfa",
+      "name": "Respond to Slack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "notes": "Must respond within 3 seconds or Slack shows a timeout error to the user — this chain is simple enough to stay well within that."
+    },
+    {
+      "parameters": {
+        "content": "THis flow is triggered by /input_idea slash command and adds the topic to the data table: some_robot_content\n\nstatus= New",
+        "height": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        -240
+      ],
+      "id": "2dbaa9bf-038b-42f8-8187-774ed5663dea",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Slash Command Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Slack Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Slack Payload": {
+      "main": [
+        [
+          {
+            "node": "Insert Idea Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Idea Row": {
+      "main": [
+        [
+          {
+            "node": "Respond to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "tags": []
+}

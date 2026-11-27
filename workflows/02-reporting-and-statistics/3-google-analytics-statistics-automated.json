@@ -1,0 +1,745 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "3- Google Analytics Statistics (Automated)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "d32019d8-4ec5-495f-bbff-f19a4f7f9e7e",
+      "name": "Daily 08:00 Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "function fmt(d) { return d.toISOString().slice(0, 10) + 'T00:00:00'; }\nfunction labelFmt(d) { const day = String(d.getDate()).padStart(2, '0'); const month = String(d.getMonth() + 1).padStart(2, '0'); return `${day}.${month}.${d.getFullYear()}`; }\n\nconst today = new Date();\nconst yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);\n\nconst monthlyStart = new Date(today); monthlyStart.setDate(monthlyStart.getDate() - 365);\nconst weeklyStart = new Date(today); weeklyStart.setDate(weeklyStart.getDate() - 56);\nconst countryStart = new Date(today); countryStart.setDate(countryStart.getDate() - 90);\nconst sourceStart = new Date(today); sourceStart.setDate(sourceStart.getDate() - 90);\nconst last7Start = new Date(today); last7Start.setDate(last7Start.getDate() - 7);\nconst campaignStart = new Date(Date.UTC(2026, 7, 20)); // 2026-08-20 taxonomy cutover, fixed (not rolling)\n\nreturn [{\n  json: {\n    monthlyStart: fmt(monthlyStart),\n    monthlyEnd: fmt(yesterday),\n    weeklyStart: fmt(weeklyStart),\n    weeklyEnd: fmt(yesterday),\n    countryStart: fmt(countryStart),\n    countryEnd: fmt(yesterday),\n    sourceStart: fmt(sourceStart),\n    sourceEnd: fmt(yesterday),\n    last7Start: fmt(last7Start),\n    last7End: fmt(yesterday),\n    campaignStart: fmt(campaignStart),\n    campaignEnd: fmt(yesterday),\n    campaignRangeLabel: `${labelFmt(campaignStart)} - ${labelFmt(yesterday)}`,\n    rangeLabel: `${labelFmt(last7Start)} - ${labelFmt(yesterday)}`,\n    generatedAt: today.toISOString()\n  }\n}];"
+      },
+      "id": "314ad1c0-1c92-4a43-92fe-e2c79f387e35",
+      "name": "Compute Rolling Date Ranges",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<ID>",
+          "cachedResultName": "SolveStack"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.monthlyStart }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.monthlyEnd }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "active1DayUsers"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "screenPageViews"
+            },
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "userEngagementDuration"
+            },
+            {
+              "listName": "sessionsPerUser"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "other",
+              "name": "yearMonth"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "3946673c-4baa-4bbb-a1ce-6db099363501",
+      "name": "Get Monthly Trends",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -320
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<ID>",
+          "cachedResultName": "SolveStack"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.weeklyStart }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.weeklyEnd }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "active1DayUsers"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "screenPageViews"
+            },
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "userEngagementDuration"
+            },
+            {
+              "listName": "sessionsPerUser"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "other",
+              "name": "yearWeek"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "1a5bb525-238b-464a-ab83-c18ec4694ba3",
+      "name": "Get Weekly Trends",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -160
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<ID>",
+          "cachedResultName": "SolveStack"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.countryStart }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.countryEnd }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "active1DayUsers"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "screenPageViews"
+            },
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "userEngagementDuration"
+            },
+            {
+              "listName": "sessionsPerUser"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "country"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "a9095fa6-8461-447d-b98e-ab6644d62433",
+      "name": "Get Country Stats",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<ID>",
+          "cachedResultName": "SolveStack"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.sourceStart }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.sourceEnd }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "active1DayUsers"
+            },
+            {
+              "listName": "eventCount"
+            },
+            {
+              "listName": "screenPageViews"
+            },
+            {
+              "listName": "sessions"
+            },
+            {
+              "listName": "userEngagementDuration"
+            },
+            {
+              "listName": "sessionsPerUser"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "other",
+              "name": "sessionSource"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "0dd7cabc-cc78-4ce7-a624-46fc0190ec9a",
+      "name": "Get Traffic By Source",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        160
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<ID>",
+          "cachedResultName": "SolveStack"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.last7Start }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.last7End }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "other",
+              "name": "engagedSessions"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "other",
+              "name": "sessionSourceMedium"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "a613cb7d-82d7-482e-979e-19d866f1e8ce",
+      "name": "Get Sessions By Source Medium",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        320
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<ID>",
+          "cachedResultName": "SolveStack"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.last7Start }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.last7End }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "other",
+              "name": "newUsers"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "other",
+              "name": "sessionSourceMedium"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "91d7906f-eb75-43c8-96c4-3717cd0de107",
+      "name": "Get New Users By Source Medium",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        480
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }\n\nconst monthlyItems = $('Get Monthly Trends').all().map(i => i.json);\nconst weeklyItems = $('Get Weekly Trends').all().map(i => i.json);\nconst countryItems = $('Get Country Stats').all().map(i => i.json);\nconst sourceItems = $('Get Traffic By Source').all().map(i => i.json);\nconst sessionsBySourceMediumItems = $('Get Sessions By Source Medium').all().map(i => i.json);\nconst newUsersBySourceMediumItems = $('Get New Users By Source Medium').all().map(i => i.json);\nconst campaignItems = $('Get Campaign Traffic').all().map(i => i.json);\nconst ranges = $('Compute Rolling Date Ranges').first().json;\n\nfunction normalizeTrend(items, periodField) {\n  return items.map(r => ({\n    period: r[periodField] || '',\n    activeUsers: num(r.active1DayUsers),\n    sessions: num(r.sessions),\n    eventCount: num(r.eventCount),\n    pageViews: num(r.screenPageViews),\n    engagementDuration: num(r.userEngagementDuration),\n    sessionsPerUser: num(r.sessionsPerUser)\n  })).sort((a, b) => a.period.localeCompare(b.period));\n}\n\nconst monthly = normalizeTrend(monthlyItems, 'yearMonth');\nconst weekly = normalizeTrend(weeklyItems, 'yearWeek');\n\nconst country = countryItems.map(r => ({\n  country: r.country || 'Unknown',\n  activeUsers: num(r.active1DayUsers),\n  sessions: num(r.sessions),\n  eventCount: num(r.eventCount)\n})).sort((a, b) => b.activeUsers - a.activeUsers).slice(0, 7);\n\nconst source = sourceItems.map(r => ({\n  source: r.sessionSource || 'Unknown',\n  sessions: num(r.sessions),\n  activeUsers: num(r.active1DayUsers)\n})).sort((a, b) => b.sessions - a.sessions).slice(0, 7);\n\nconst sessionsBySourceMedium = sessionsBySourceMediumItems.map(r => ({\n  sourceMedium: r.sessionSourceMedium || 'Unknown',\n  engagedSessions: num(r.engagedSessions)\n})).sort((a, b) => b.engagedSessions - a.engagedSessions).slice(0, 12);\n\nconst newUsersBySourceMedium = newUsersBySourceMediumItems.map(r => ({\n  sourceMedium: r.sessionSourceMedium || 'Unknown',\n  newUsers: num(r.newUsers)\n})).sort((a, b) => b.newUsers - a.newUsers).slice(0, 12);\n\nconst CAMPAIGN_SOURCES = ['newsletter', 'lifecycle', 'demo-day'];\nconst CAMPAIGN_LABELS = { newsletter: 'Newsletter', lifecycle: 'Lifecycle', 'demo-day': 'Demo Day' };\nconst campaignBySource = {};\ncampaignItems.forEach(r => {\n  const src = (r.sessionSource || '').toLowerCase();\n  if (CAMPAIGN_SOURCES.includes(src)) {\n    campaignBySource[src] = { activeUsers: num(r.active1DayUsers), sessions: num(r.sessions) };\n  }\n});\nconst campaignPerformance = CAMPAIGN_SOURCES.map(src => ({\n  source: src,\n  label: CAMPAIGN_LABELS[src],\n  activeUsers: campaignBySource[src] ? campaignBySource[src].activeUsers : 0,\n  sessions: campaignBySource[src] ? campaignBySource[src].sessions : 0\n}));\n\nfunction sum(arr, key) { return arr.reduce((s, x) => s + x[key], 0); }\n\nconst totals = {\n  totalActiveUsers: sum(monthly, 'activeUsers'),\n  totalSessions: sum(monthly, 'sessions'),\n  totalEvents: sum(monthly, 'eventCount'),\n  totalPageViews: sum(monthly, 'pageViews'),\n  totalNewUsersLast7Days: sum(newUsersBySourceMedium, 'newUsers'),\n  totalEngagedSessionsLast7Days: sum(sessionsBySourceMedium, 'engagedSessions')\n};\n\nreturn [{\n  json: {\n    monthly, weekly, country, source, sessionsBySourceMedium, newUsersBySourceMedium, campaignPerformance, totals,\n    rangeLabel: ranges.rangeLabel,\n    campaignRangeLabel: ranges.campaignRangeLabel,\n    generatedAt: ranges.generatedAt\n  }\n}];"
+      },
+      "id": "6eaf0b8e-a45b-4e33-821d-105e5517af68",
+      "name": "Compute GA4 Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        160
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = items[0].json;\n\nconst MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\nfunction formatYearMonth(ym) { if (!ym || ym.length !== 6) return ym; const y = ym.slice(0, 4); const m = Number(ym.slice(4, 6)); return `${MONTH_NAMES[m - 1]} ${y.slice(2)}`; }\nfunction formatYearWeek(yw) { if (!yw || yw.length < 6) return yw; const y = yw.slice(0, 4); const w = yw.slice(4); return `W${w} '${y.slice(2)}`; }\n\nconst output = [];\n\n// 1) Monthly trend\noutput.push({\n  json: {\n    key: 'monthlyTrend',\n    fileName: 'ga4_monthly_trend.png',\n    title: 'GA4 Monthly Trend',\n    chartConfig: {\n      chart: {\n        type: 'line',\n        data: {\n          labels: data.monthly.map(m => formatYearMonth(m.period)),\n          datasets: [\n            { label: 'Sessions', data: data.monthly.map(m => m.sessions), borderColor: '#3b6cf6', fill: false },\n            { label: 'Active Users', data: data.monthly.map(m => m.activeUsers), borderColor: '#1f2a44', fill: false }\n          ]\n        },\n        options: { plugins: { title: { display: true, text: 'Monthly Trend — Sessions & Active Users' } }, scales: { y: { beginAtZero: true } } }\n      },\n      width: 760, height: 400, backgroundColor: 'white', format: 'png'\n    }\n  }\n});\n\n// 2) Weekly trend\noutput.push({\n  json: {\n    key: 'weeklyTrend',\n    fileName: 'ga4_weekly_trend.png',\n    title: 'GA4 Weekly Trend',\n    chartConfig: {\n      chart: {\n        type: 'bar',\n        data: {\n          labels: data.weekly.map(w => formatYearWeek(w.period)),\n          datasets: [\n            { label: 'Sessions', data: data.weekly.map(w => w.sessions), backgroundColor: '#3b6cf6' },\n            { label: 'Active Users', data: data.weekly.map(w => w.activeUsers), backgroundColor: '#8fb3ff' }\n          ]\n        },\n        options: { plugins: { title: { display: true, text: 'Weekly Trend — Sessions & Active Users' } }, scales: { y: { beginAtZero: true } } }\n      },\n      width: 760, height: 400, backgroundColor: 'white', format: 'png'\n    }\n  }\n});\n\n// 3) Country breakdown\noutput.push({\n  json: {\n    key: 'countryBreakdown',\n    fileName: 'ga4_country_breakdown.png',\n    title: 'GA4 Active Users & Sessions by Country',\n    chartConfig: {\n      chart: {\n        type: 'bar',\n        data: {\n          labels: data.country.map(c => c.country),\n          datasets: [\n            { label: 'Active Users', data: data.country.map(c => c.activeUsers), backgroundColor: '#1f2a44' },\n            { label: 'Sessions', data: data.country.map(c => c.sessions), backgroundColor: '#3b6cf6' }\n          ]\n        },\n        options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Top 7 Countries — Active Users & Sessions (Last 90 Days)' }, legend: { display: true } } }\n      },\n      width: 760, height: 420, backgroundColor: 'white', format: 'png'\n    }\n  }\n});\n\n// 4) Traffic source breakdown\noutput.push({\n  json: {\n    key: 'trafficSource',\n    fileName: 'ga4_traffic_source.png',\n    title: 'GA4 Sessions by Traffic Source',\n    chartConfig: {\n      chart: {\n        type: 'bar',\n        data: { labels: data.source.map(s => s.source), datasets: [{ label: 'Sessions', data: data.source.map(s => s.sessions), backgroundColor: '#3b6cf6' }] },\n        options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Sessions by Traffic Source' }, legend: { display: false } } }\n      },\n      width: 760, height: 420, backgroundColor: 'white', format: 'png'\n    }\n  }\n});\n\n// 5) Email campaign performance (Newsletter, Lifecycle, Demo Day)\noutput.push({\n  json: {\n    key: 'campaignPerformance',\n    fileName: 'ga4_campaign_performance.png',\n    title: 'GA4 Email Campaign Performance',\n    chartConfig: {\n      chart: {\n        type: 'bar',\n        data: {\n          labels: data.campaignPerformance.map(c => c.label),\n          datasets: [\n            { label: 'Active Users', data: data.campaignPerformance.map(c => c.activeUsers), backgroundColor: '#1f2a44' },\n            { label: 'Sessions', data: data.campaignPerformance.map(c => c.sessions), backgroundColor: '#3b6cf6' }\n          ]\n        },\n        options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Email Campaign Performance — Newsletter, Lifecycle, Demo Day' }, legend: { display: true } } }\n      },\n      width: 760, height: 360, backgroundColor: 'white', format: 'png'\n    }\n  }\n});\n\n// 6) New users by source/medium (last 7 days)\noutput.push({\n  json: {\n    key: 'newUsersBySourceMedium',\n    fileName: 'ga4_newusers_source_medium.png',\n    title: 'GA4 New Users by Source/Medium (Last 7 Days)',\n    chartConfig: {\n      chart: {\n        type: 'bar',\n        data: { labels: data.newUsersBySourceMedium.map(s => s.sourceMedium), datasets: [{ label: 'New Users', data: data.newUsersBySourceMedium.map(s => s.newUsers), backgroundColor: '#1f2a44' }] },\n        options: { indexAxis: 'y', plugins: { title: { display: true, text: 'New Users by Source/Medium (Last 7 Days)' }, legend: { display: false } } }\n      },\n      width: 760, height: 420, backgroundColor: 'white', format: 'png'\n    }\n  }\n});\n\nreturn output;"
+      },
+      "id": "940456d8-d9fc-4717-aad9-11a7ca63db8b",
+      "name": "Prepare Chart Configs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dcca670d-c2d9-4d98-a5b3-44b04184871c",
+      "name": "Render Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1104,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "={{ $('Prepare Chart Configs').item.json.fileName }}",
+          "title": "={{ $('Prepare Chart Configs').item.json.title }}"
+        }
+      },
+      "id": "24ac472a-eecc-496b-8250-12bd30389d7a",
+      "name": "Upload Chart to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1328,
+        160
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "40df3e13-75ed-4df4-b4b1-497bb8086ef2",
+      "name": "Wait For Slack Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1552,
+        160
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chartMeta = $('Prepare Chart Configs').all();\nconst uploads = items; // this node's input = Upload Chart to Slack output, 1:1 with chartMeta by index\n\nconst permalinkByKey = {};\nfor (let i = 0; i < chartMeta.length; i++) {\n  const key = chartMeta[i].json.key;\n  const permalink = uploads[i] && uploads[i].json ? uploads[i].json.permalink : null;\n  permalinkByKey[key] = permalink;\n}\n\nconst stats = $('Compute GA4 Stats').first().json;\nconst totals = stats.totals || {};\n\nfunction fmt(v) { return (v === null || v === undefined) ? '—' : v; }\n\nconst sourceRows = stats.source.map(s => `| ${s.source} | ${fmt(s.sessions)} | ${fmt(s.activeUsers)} |`).join('\\n');\nconst newUsersSourceRows = stats.newUsersBySourceMedium.map(s => `| ${s.sourceMedium} | ${fmt(s.newUsers)} |`).join('\\n');\n\nconst canvasContent = [\n  '# 📊 SolveStack.AI GA4 Analytics Dashboard',\n  '',\n  `Report Generated: ${stats.generatedAt}`,\n  '',\n  '_Fully automated — runs daily at 08:00, pulls fresh GA4 data, renders charts, and republishes this canvas. No manual steps._',\n  '',\n  '---',\n  '',\n  '# 🟦 Metric Definitions',\n  '',\n  '- **Active Users**: GA4\\'s 1-day active users metric — the number of distinct users who had an engaged session at any point during the selected period, whether they were new or returning that period. Each person is counted once regardless of how many sessions they had.',\n  '- **New Users**: The number of distinct users who visited for the very first time (triggered GA4\\'s `first_visit`/`first_open` event) during the selected period. New Users is always a subset of Active Users for the same period — it never includes returning visitors.',\n  '- **Sessions**: A group of user interactions within a given time frame — GA4 starts a new session when a user first engages, and it ends after 30 minutes of inactivity (default) or at midnight. One user can generate many sessions in a period. This is the \"Sessions\" total used in the Summary, the Monthly/Weekly Trend charts, Country Statistics, and Traffic Sources below.',\n  '- **Pageviews**: The total number of times a page (web) or screen (app) was loaded or became visible. If one user reloads or navigates back to the same page, each instance counts separately.',\n  '',\n  '---',\n  '',\n  '# 🟦 Traffic Source Definitions',\n  '',\n  '_Taxonomy cutover: 2026-08-20. Lifecycle emails already send with the new tagging from 2026-08-21 onward. The Newsletter and Demo Day sources below start showing tagged sessions once those next sends go out — newsletter in ~2 weeks, demo day on 2026-08-24, 2026-08-26, and 2026-08-31. Historical sessions logged before the cutover keep their old tagging and won\\'t be relabeled._',\n  '',\n  '- **Direct**: Visitors who reached SolveStack.ai by typing the URL directly, using a bookmark, or opening a link without a detectable referral source. This typically represents returning users or users already familiar with the platform.',\n  '- **Google (Organic Search)**: Visitors who discovered SolveStack.ai through Google Search results. This reflects your SEO performance and organic discoverability.',\n  '- **LinkedIn**: Visitors who clicked a link to SolveStack.ai from LinkedIn posts, company pages, profiles, or messages that weren\\'t run through our own campaign tagging. Measures the effectiveness of organic LinkedIn presence and community engagement.',\n  '- **Lifecycle** (`utm_source=lifecycle`): Visitors who clicked a link in an automated customer/startup lifecycle email — the welcome message or a 2-week/1-month/2-month re-engagement reminder. Break down by `sessionCampaignName` to compare welcome vs. each reminder stage.',\n  '- **Newsletter** (`utm_source=newsletter`): Visitors who clicked a link in the bi-weekly SolveStack.ai newsletter. `sessionCampaignName` identifies the specific issue (dated `YYYY-MM-DD`).',\n  '- **Demo Day** (`utm_source=demo-day`): Visitors who clicked a link in a demo day event invitation email. `sessionCampaignName`/`utm_content` distinguishes the invite from follow-up reminder sends.',\n  '- **Campaign** (`utm_source=campaign`): Visitors who clicked a link in a one-off email campaign outside the three recurring programs above — launches, promotions, win-back sends, referral asks, etc. `sessionCampaignName` identifies the specific campaign.',\n  '- **Other / unlabeled sources**: Any value not covered above (an untagged share, a third-party referral, a paid channel). Check `sessionSourceMedium` in the raw GA4 data for the exact channel before treating it as noise.',\n  '',\n  '---',\n  '',\n  '# Summary (Last 12 Months)',\n  '',\n  '| Metric | Total |',\n  '|---|---|',\n  `| Active Users | ${fmt(totals.totalActiveUsers)} |`,\n  `| Sessions | ${fmt(totals.totalSessions)} |`,\n  `| Page Views | ${fmt(totals.totalPageViews)} |`,\n  `| New Users (Last 7 Days) | ${fmt(totals.totalNewUsersLast7Days)} |`,\n  '',\n  '---',\n  '',\n  '# Monthly Trend (Last 12 Months)',\n  '',\n  `![Monthly Trend](${permalinkByKey['monthlyTrend']})`,\n  '',\n  '---',\n  '',\n  '# Weekly Trend (Last 8 Weeks)',\n  '',\n  `![Weekly Trend](${permalinkByKey['weeklyTrend']})`,\n  '',\n  '---',\n  '',\n  '# Country-Specific Statistics (Last 90 Days)',\n  '',\n  '_Note: this covers a rolling 90-day window — a different period than the 12-month Summary above. Showing the top 7 countries by Active Users._',\n  '',\n  `![Country Breakdown](${permalinkByKey['countryBreakdown']})`,\n  '',\n  '---',\n  '',\n  '# Awareness & Reach',\n  '',\n  '## Traffic Sources (Last 90 Days, Top 7 by Sessions)',\n  '',\n  '| Source | Sessions | Active Users |',\n  '|---|---|---|',\n  sourceRows,\n  '',\n  `![Traffic Source](${permalinkByKey['trafficSource']})`,\n  '',\n  `## New Users per Source/Medium (${stats.rangeLabel})`,\n  '',\n  '| Source / Medium | New Users |',\n  '|---|---|',\n  newUsersSourceRows,\n  '',\n  `![New Users by Source/Medium](${permalinkByKey['newUsersBySourceMedium']})`,\n  '',\n  '---',\n  '',\n  `## Email Campaign Performance (${stats.campaignRangeLabel})`,\n  '',\n  '_Active Users and Sessions driven by clicks from the Newsletter, Lifecycle, and Demo Day email campaigns — see the Newsletter / Lifecycle / Demo Day definitions above. Measured from 2026-08-20 (taxonomy cutover) onward, since sends before that date weren’t tagged this way._',\n  '',\n  `![Email Campaign Performance](${permalinkByKey['campaignPerformance']})`,\n  ''\n].join('\\n');\n\nreturn [{ json: { canvasContent } }];"
+      },
+      "id": "4dc069e2-f2d5-4ac7-b44e-9bf0b585d802",
+      "name": "Build Canvas Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        160
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/canvases.edit",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { canvas_id: \"<SLACK_ID>\", changes: [ { operation: \"replace\", document_content: { type: \"markdown\", markdown: $json.canvasContent } } ] } }}",
+        "options": {}
+      },
+      "id": "83fbe9fd-a11c-4484-b8c0-d95be316f9a3",
+      "name": "Replace GA4 Canvas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1984,
+        160
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 3- Google Analytics Statistics (Automated)\n\nRuns daily at 08:00. Pulls GA4 report data (monthly trend, weekly trend, country breakdown, traffic source breakdown, engaged sessions by source/medium and new users by source/medium over the last 7 days), computes stats, renders 6 chart images via QuickChart, uploads them to get permalinks, then replaces the shared GA4 Slack canvas (<SLACK_ID>) with the full report.\n\nNo email step — replaces the manual \"download JSON -> email -> upload to Claude -> post to Slack\" step from the original '3- Google Analytics Statistics' flow. Does NOT modify that original workflow; it stays as a manual reference.",
+        "height": 320,
+        "width": 560,
+        "color": 4
+      },
+      "id": "952d8ca7-a2cb-4d1f-b398-397b2bf8aa88",
+      "name": "Sticky Note 4305a43d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        -416
+      ]
+    },
+    {
+      "parameters": {
+        "propertyId": {
+          "__rl": true,
+          "cachedResultName": "SolveStack",
+          "mode": "list",
+          "value": "<ID>"
+        },
+        "dateRange": "custom",
+        "startDate": "={{ $('Compute Rolling Date Ranges').first().json.campaignStart }}",
+        "endDate": "={{ $('Compute Rolling Date Ranges').first().json.campaignEnd }}",
+        "metricsGA4": {
+          "metricValues": [
+            {
+              "listName": "active1DayUsers"
+            },
+            {
+              "listName": "sessions"
+            }
+          ]
+        },
+        "dimensionsGA4": {
+          "dimensionValues": [
+            {
+              "listName": "other",
+              "name": "sessionSource"
+            }
+          ]
+        },
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "b1d1b767-94ef-45c7-b808-9b7c8d0209e8",
+      "name": "Get Campaign Traffic",
+      "type": "n8n-nodes-base.googleAnalytics",
+      "typeVersion": 2,
+      "position": [
+        448,
+        640
+      ],
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "<your googleAnalyticsOAuth2>"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 08:00 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Compute Rolling Date Ranges",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Rolling Date Ranges": {
+      "main": [
+        [
+          {
+            "node": "Get Monthly Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Monthly Trends": {
+      "main": [
+        [
+          {
+            "node": "Get Weekly Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Weekly Trends": {
+      "main": [
+        [
+          {
+            "node": "Get Country Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Country Stats": {
+      "main": [
+        [
+          {
+            "node": "Get Traffic By Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Traffic By Source": {
+      "main": [
+        [
+          {
+            "node": "Get Sessions By Source Medium",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sessions By Source Medium": {
+      "main": [
+        [
+          {
+            "node": "Get New Users By Source Medium",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute GA4 Stats": {
+      "main": [
+        [
+          {
+            "node": "Prepare Chart Configs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Chart Configs": {
+      "main": [
+        [
+          {
+            "node": "Render Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload Chart to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Chart to Slack": {
+      "main": [
+        [
+          {
+            "node": "Wait For Slack Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Slack Processing": {
+      "main": [
+        [
+          {
+            "node": "Build Canvas Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Canvas Content": {
+      "main": [
+        [
+          {
+            "node": "Replace GA4 Canvas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Users By Source Medium": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign Traffic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Campaign Traffic": {
+      "main": [
+        [
+          {
+            "node": "Compute GA4 Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

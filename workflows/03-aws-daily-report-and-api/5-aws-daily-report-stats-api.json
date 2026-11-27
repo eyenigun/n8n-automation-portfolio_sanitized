@@ -1,0 +1,512 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "5- AWS Daily Report Stats — API",
+  "active": false,
+  "nodes": [
+    {
+      "id": "408a9b54-0ba2-4944-a651-838e2a8df45c",
+      "name": "GET /reports/aws-daily/runs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "reports/aws-daily/runs",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "<your httpHeaderAuth>"
+        }
+      }
+    },
+    {
+      "id": "ff9aa5f3-fc39-4ff9-af46-cb9101ecbed2",
+      "name": "List Report Rows",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<DATA_TABLE_ID>",
+          "cachedResultName": "aws_daily_report_stats"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": []
+        },
+        "returnAll": false,
+        "limit": "={{ $json.query.days ? Number($json.query.days) : 8 }}",
+        "orderBy": true,
+        "orderByColumn": "reportDate",
+        "orderByDirection": "DESC"
+      }
+    },
+    {
+      "id": "916032f3-d81b-4d38-88c9-625d7f5b7bc3",
+      "name": "Respond List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseKey": "data",
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "8953a214-cae5-47b5-8c09-14292769fe6e",
+      "name": "POST /reports/aws-daily/runs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        224
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reports/aws-daily/runs",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "<your httpHeaderAuth>"
+        }
+      }
+    },
+    {
+      "id": "bd86e6b2-2d2e-4cb7-9b7b-81c2ce4179e7",
+      "name": "Build Run Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        224
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var now = new Date();\nvar runId = \"run_\" + now.toISOString().replace(/[-:TZ.]/g, \"\").slice(0, 14);\nreturn [{ json: { runId: runId, acceptedAt: now.toISOString() } }];"
+      }
+    },
+    {
+      "id": "7107a128-7542-4791-b59f-cb464d321f83",
+      "name": "Invoke AWS Daily Report Core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        224
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<WORKFLOW_ID>",
+          "cachedResultName": "4- AWS Daily Report Stats — Production"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "24c7c5f6-c09d-434b-a91b-be7cc5fccb50",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        224
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": {
+          "runId": "={{ $(\"Build Run Id\").item.json.runId }}",
+          "status": "queued",
+          "acceptedAt": "={{ $(\"Build Run Id\").item.json.acceptedAt }}"
+        },
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "33bef5cb-0db2-453d-a039-37b153481360",
+      "name": "GET /reports/aws-daily/runs/latest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        448
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "reports/aws-daily/runs/latest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "<your httpHeaderAuth>"
+        }
+      }
+    },
+    {
+      "id": "07f67c24-f4f0-4b2b-8327-6103b0dbbf6c",
+      "name": "Get Latest Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        448
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<DATA_TABLE_ID>",
+          "cachedResultName": "aws_daily_report_stats"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": []
+        },
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": true,
+        "orderByColumn": "reportDate",
+        "orderByDirection": "DESC"
+      }
+    },
+    {
+      "id": "da3ff3f4-22cf-4374-bccb-329ebca36571",
+      "name": "Respond Latest",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        448
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "519401ab-10fc-408e-8f7d-2b539c11e457",
+      "name": "GET /reports/aws-daily/runs/:reportDate",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        768
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "reports/aws-daily/runs/:reportDate",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "<your httpHeaderAuth>"
+        }
+      }
+    },
+    {
+      "id": "cadb3f68-c502-4552-890e-e888f17a64cc",
+      "name": "Get Row By Date",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        768
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<DATA_TABLE_ID>",
+          "cachedResultName": "aws_daily_report_stats"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "reportDate",
+              "condition": "eq",
+              "keyValue": "={{ $json.params.reportDate }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d587855b-70fa-4017-9e0c-ada760ba75c1",
+      "name": "Flag Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        768
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var items = $input.all();\nvar row = (items.length > 0) ? items[0].json : null;\nif (!row || !row.reportDate) { return [{ json: { __notFound: true } }]; }\nreturn [{ json: Object.assign({ __notFound: false }, row) }];"
+      }
+    },
+    {
+      "id": "1ff97af3-e3da-4d1d-8283-33fd1733919e",
+      "name": "Found?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        768
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "notFound",
+              "conditions": {
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.__notFound }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "rightValue": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Found"
+        }
+      }
+    },
+    {
+      "id": "10035183-2aee-433e-b691-acc89d849366",
+      "name": "Respond Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        672
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": {
+          "code": "not_found",
+          "message": "No report stored for that date"
+        },
+        "options": {
+          "responseCode": 404
+        }
+      }
+    },
+    {
+      "id": "c2f71135-db58-45f5-b3e0-fe3ef4f7e423",
+      "name": "Respond Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        864
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GET /reports/aws-daily/runs": {
+      "main": [
+        [
+          {
+            "node": "List Report Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Report Rows": {
+      "main": [
+        [
+          {
+            "node": "Respond List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /reports/aws-daily/runs": {
+      "main": [
+        [
+          {
+            "node": "Build Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Id": {
+      "main": [
+        [
+          {
+            "node": "Invoke AWS Daily Report Core",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoke AWS Daily Report Core": {
+      "main": [
+        [
+          {
+            "node": "Respond Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /reports/aws-daily/runs/latest": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Row": {
+      "main": [
+        [
+          {
+            "node": "Respond Latest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /reports/aws-daily/runs/:reportDate": {
+      "main": [
+        [
+          {
+            "node": "Get Row By Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Row By Date": {
+      "main": [
+        [
+          {
+            "node": "Flag Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag Found": {
+      "main": [
+        [
+          {
+            "node": "Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Found?": {
+      "main": [
+        [
+          {
+            "node": "Respond Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "tags": []
+}

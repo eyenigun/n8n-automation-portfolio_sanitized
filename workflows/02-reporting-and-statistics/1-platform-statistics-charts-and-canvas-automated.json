@@ -1,0 +1,1034 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "1- Platform Statistics - Charts and Canvas (Automated)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "5754200e-1709-46f8-8e8a-7613db0c9165",
+      "name": "Daily 07:00 Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1200,
+        192
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "token-field",
+              "name": "token",
+              "type": "string",
+              "value": "<REDACTED>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ac31d022-9808-482a-afe7-928ba6abfd43",
+      "name": "Set API Token",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -976,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "{{PLATFORM_API_BASE_URL}}/startups/list",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "<REDACTED>"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c4285ce-3b19-4495-baab-b9d947b0105b",
+      "name": "Fetch Startups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -752,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "{{PLATFORM_API_BASE_URL}}/customers/list",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "<REDACTED>"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "90e75905-7faa-47b5-8a36-07d3d685ce12",
+      "name": "Fetch Customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -768,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "url": "{{PLATFORM_API_BASE_URL}}/cases/view-counts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "<REDACTED>"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7cf56e5a-391e-476d-92f9-8178bb075a05",
+      "name": "Fetch Use Case Views",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -768,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const startups = $input.all().map(item => item.json);\nconst cleaned = startups.filter(s => !((s.name || '').toLowerCase().includes('test')));\nreturn cleaned.map(s => ({ json: s }));"
+      },
+      "id": "42cdf049-9ec6-4d40-beb1-e74a30c3f5d5",
+      "name": "Remove Test Startups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const customers = $input.all().map(item => item.json);\nconst cleaned = customers.filter(c => !((c.companyName || c.name || '').toLowerCase().includes('test')));\nreturn cleaned.map(c => ({ json: c }));"
+      },
+      "id": "629d1019-593c-4433-af43-3b8d422826f0",
+      "name": "Remove Test Customers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cases = $('Fetch Use Case Views').all().map(item => item.json);\nconst cleanStartupIds = new Set($('Remove Test Startups').all().map(item => item.json.id));\n\nconst cleaned = cases.filter(c => c.startup && cleanStartupIds.has(c.startup.id));\n\nreturn cleaned.map(c => ({ json: c }));"
+      },
+      "id": "c135d292-f368-4a53-9b66-0d8dcd90e366",
+      "name": "Remove Test Use Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const startups = $input.all().map(item => item.json);\n\nconst monthlyCounts = {};\nfor (const s of startups) {\n  if (!s.createdAt) continue;\n  const d = new Date(s.createdAt);\n  if (isNaN(d.getTime())) continue;\n  const key = d.toISOString().slice(0, 7);\n  monthlyCounts[key] = (monthlyCounts[key] || 0) + 1;\n}\n\nconst months = Object.keys(monthlyCounts).sort();\nconst newCounts = months.map(m => monthlyCounts[m]);\nconst monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\nconst labels = months.map(m => {\n  const [y, mo] = m.split('-');\n  return monthNames[Number(mo) - 1] + ' ' + y.slice(2);\n});\n\nlet running = 0;\nconst cumulative = newCounts.map(c => { running += c; return running; });\n\nlet linkedUseCases = 0;\nlet startupsWithZero = 0;\nfor (const s of startups) {\n  const n = Array.isArray(s.cases) ? s.cases.length : 0;\n  linkedUseCases += n;\n  if (n === 0) startupsWithZero++;\n}\nconst avgPerStartup = startups.length ? Number((linkedUseCases / startups.length).toFixed(2)) : 0;\n\nconst chartConfig = {\n  chart: {\n    type: 'bar',\n    data: {\n      labels,\n      datasets: [\n        {\n          type: 'bar',\n          label: 'New',\n          data: newCounts,\n          backgroundColor: '#7C6FEC',\n          yAxisID: 'y-new'\n        },\n        {\n          type: 'line',\n          label: 'Cumulative',\n          data: cumulative,\n          borderColor: '#1baf7a',\n          backgroundColor: 'rgba(27,175,122,0.08)',\n          fill: true,\n          lineTension: 0.3,\n          pointRadius: 4,\n          pointBackgroundColor: '#1baf7a',\n          borderWidth: 2,\n          yAxisID: 'y-cumul'\n        }\n      ]\n    },\n    options: {\n      title: { display: true, text: 'Monthly registrations' },\n      legend: { display: true },\n      scales: {\n        yAxes: [\n          {\n            id: 'y-new',\n            type: 'linear',\n            position: 'left',\n            ticks: { beginAtZero: true },\n            scaleLabel: { display: true, labelString: 'New' }\n          },\n          {\n            id: 'y-cumul',\n            type: 'linear',\n            position: 'right',\n            ticks: { beginAtZero: true },\n            gridLines: { drawOnChartArea: false },\n            scaleLabel: { display: true, labelString: 'Total' }\n          }\n        ]\n      }\n    }\n  },\n  width: 760,\n  height: 380,\n  backgroundColor: 'white',\n  format: 'png'\n};\n\nreturn [{\n  json: {\n    stats: {\n      totalStartups: startups.length,\n      linkedUseCases,\n      avgUseCasesPerStartup: avgPerStartup,\n      startupsWithZeroUseCases: startupsWithZero,\n      monthlyGrowth: months.map((m, i) => ({ month: labels[i], count: newCounts[i] }))\n    },\n    chartConfig\n  }\n}];"
+      },
+      "id": "2b644fc5-d2f4-4e07-bb2e-2d381408eaf1",
+      "name": "Compute Startup Stats & Chart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const startups = $input.all().map(item => item.json);\n\nconst countryCounts = {};\nfor (const s of startups) {\n  const country = (s.location || 'Unknown').trim() || 'Unknown';\n  countryCounts[country] = (countryCounts[country] || 0) + 1;\n}\n\nconst sorted = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);\nconst labels = sorted.map(([country]) => country);\nconst counts = sorted.map(([, count]) => count);\n\nconst chartConfig = {\n  chart: {\n    type: 'bar',\n    data: { labels, datasets: [{ label: 'Startups', data: counts, backgroundColor: '#4C6EF5' }] },\n    options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Top locations' }, legend: { display: false } } }\n  },\n  width: 760,\n  height: 420,\n  backgroundColor: 'white',\n  format: 'png'\n};\n\nreturn [{\n  json: { stats: { topCountries: sorted.map(([country, count]) => ({ country, count })) }, chartConfig }\n}];"
+      },
+      "id": "b2e908f1-5239-4cd3-8a07-879e2e62a40b",
+      "name": "Compute Country Stats & Chart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const customers = $input.all().map(item => item.json);\n\nconst monthlyCounts = {};\nfor (const c of customers) {\n  if (c.createdAt) {\n    const d = new Date(c.createdAt);\n    if (!isNaN(d.getTime())) {\n      const key = d.toISOString().slice(0, 7);\n      monthlyCounts[key] = (monthlyCounts[key] || 0) + 1;\n    }\n  }\n}\n\nconst subscribed = customers.filter(c => c.isSubscribed).length;\nconst notSubscribed = customers.length - subscribed;\n\nconst months = Object.keys(monthlyCounts).sort();\nconst newCounts = months.map(m => monthlyCounts[m]);\nconst monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\nconst labels = months.map(m => {\n  const [y, mo] = m.split('-');\n  return monthNames[Number(mo) - 1] + ' ' + y.slice(2);\n});\n\nlet running = 0;\nconst cumulative = newCounts.map(c => { running += c; return running; });\n\nconst chartConfig = {\n  chart: {\n    type: 'bar',\n    data: {\n      labels,\n      datasets: [\n        {\n          type: 'bar',\n          label: 'New',\n          data: newCounts,\n          backgroundColor: '#F76707',\n          yAxisID: 'y-new'\n        },\n        {\n          type: 'line',\n          label: 'Cumulative',\n          data: cumulative,\n          borderColor: '#1baf7a',\n          backgroundColor: 'rgba(27,175,122,0.08)',\n          fill: true,\n          lineTension: 0.3,\n          pointRadius: 4,\n          pointBackgroundColor: '#1baf7a',\n          borderWidth: 2,\n          yAxisID: 'y-cumul'\n        }\n      ]\n    },\n    options: {\n      title: { display: true, text: 'Customer Monthly Growth' },\n      legend: { display: true },\n      scales: {\n        yAxes: [\n          {\n            id: 'y-new',\n            type: 'linear',\n            position: 'left',\n            ticks: { beginAtZero: true },\n            scaleLabel: { display: true, labelString: 'New' }\n          },\n          {\n            id: 'y-cumul',\n            type: 'linear',\n            position: 'right',\n            ticks: { beginAtZero: true },\n            gridLines: { drawOnChartArea: false },\n            scaleLabel: { display: true, labelString: 'Total' }\n          }\n        ]\n      }\n    }\n  },\n  width: 700,\n  height: 380,\n  backgroundColor: 'white',\n  format: 'png'\n};\n\nreturn [{\n  json: {\n    stats: {\n      totalCustomers: customers.length,\n      subscribed,\n      notSubscribed,\n      monthlyGrowth: months.map((m, i) => ({ month: labels[i], count: newCounts[i] }))\n    },\n    chartConfig\n  }\n}];"
+      },
+      "id": "a84cfcb7-019d-4402-bf7e-af0d21dbb056",
+      "name": "Compute Customer Stats & Chart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cases = $input.all().map(item => item.json);\n\nconst byStatus = {};\nfor (const c of cases) {\n  const raw = (c.status || 'Unknown').trim();\n  const status = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();\n  byStatus[status] = (byStatus[status] || 0) + 1;\n}\n\nconst topByViews = cases.slice().sort((a, b) => (b.totalViews || 0) - (a.totalViews || 0)).slice(0, 10);\nconst labels = topByViews.map(c => (c.title && c.title.length > 30) ? c.title.slice(0, 27) + '...' : (c.title || 'Untitled'));\nconst counts = topByViews.map(c => c.totalViews || 0);\n\nconst chartConfig = {\n  chart: {\n    type: 'bar',\n    data: { labels, datasets: [{ label: 'Views', data: counts, backgroundColor: '#AE3EC9' }] },\n    options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Top 10 Use Cases by Views' }, legend: { display: false } } }\n  },\n  width: 700,\n  height: 420,\n  backgroundColor: 'white',\n  format: 'png'\n};\n\nreturn [{\n  json: { stats: { totalUseCases: cases.length, byStatus, topByViews: topByViews.map(c => ({ title: c.title, views: c.totalViews || 0 })) }, chartConfig }\n}];"
+      },
+      "id": "b1c6a844-289b-4373-9262-c157c98f7a32",
+      "name": "Compute UseCase Stats & Chart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "2abc89c0-1960-4441-910a-585ec04f5d1c",
+      "name": "Render Startup Growth Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        368,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "monthly_registrations.png",
+          "title": "Monthly registrations"
+        }
+      },
+      "id": "b461a703-d544-4789-9ba9-b9ebe1932b85",
+      "name": "Upload Startup Growth Chart",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        592,
+        -192
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 6
+      },
+      "id": "0535cea4-c10d-4b7f-8ee9-f4f6c50e8999",
+      "name": "Combine All Branches",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1312,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "fce0412e-516f-41f6-a99b-e2d08b4da419",
+      "name": "Render Country Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        368,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "top_locations.png",
+          "title": "Top locations"
+        }
+      },
+      "id": "368759f7-0816-4b73-9aed-b7b1b790dd17",
+      "name": "Upload Country Chart",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        592,
+        -16
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "852a3547-ddc0-4c2e-a462-fe3ab0f905fb",
+      "name": "Render Customer Growth Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        352,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "customer_growth.png",
+          "title": "Customer Signups by Month"
+        }
+      },
+      "id": "154fd0b1-4304-4d63-8d3c-97d22e37644c",
+      "name": "Upload Customer Growth Chart",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        576,
+        416
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "d7e40cf1-e2d4-46a7-aee8-50adff4097b2",
+      "name": "Render UseCase Views Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        336,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "top_usecases.png",
+          "title": "Top 10 Use Cases by Views"
+        }
+      },
+      "id": "67ccbf5d-0049-4e52-a78c-ee428292c7c6",
+      "name": "Upload UseCase Views Chart",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        560,
+        208
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const startupStats = $('Compute Startup Stats & Chart').first().json.stats;\nconst customerStats = $('Compute Customer Stats & Chart').first().json.stats;\nconst useCaseStats = $('Compute UseCase Stats & Chart').first().json.stats;\n\nconst monthlyRegChartUrl = $('Upload Startup Growth Chart').first().json.permalink;\nconst topLocationsChartUrl = $('Upload Country Chart').first().json.permalink;\nconst topStartupsChartUrl = $('Upload Top Startups Chart').first().json.permalink;\nconst customerChartUrl = $('Upload Customer Growth Chart').first().json.permalink;\nconst useCaseChartUrl = $('Upload UseCase Views Chart').first().json.permalink;\nconst useCaseMonthlyChartUrl = $('Upload UseCase Monthly Chart').first().json.permalink;\n\nconst now = new Date().toISOString();\n\nconst statusLines = Object.entries(useCaseStats.byStatus).map(([status, count]) => `- ${status}: ${count}`).join('\\n');\n\nconst conversionRate = customerStats.totalCustomers > 0\n  ? ((customerStats.subscribed / customerStats.totalCustomers) * 100).toFixed(1)\n  : '0.0';\n\nconst canvasContent = [\n  '# AI Ecosystem Analytics Dashboard',\n  '',\n  `Report Generated: ${now}`,\n  '',\n  '---',\n  '',\n  '# STARTUP ECOSYSTEM',\n  '',\n  `**Total startups:** ${startupStats.totalStartups} (excl. test accounts)`,\n   `**Startups with 0 use cases:** ${startupStats.startupsWithZeroUseCases} (registered but no submission yet)`,\n  '',\n  '## Top locations',\n  `![Top locations](${topLocationsChartUrl})`,\n  '',\n  '## Top 10 startups by use cases linked',\n  `![Top startups by use cases](${topStartupsChartUrl})`,\n  '',\n  '## Monthly registrations',\n  `![Monthly registrations](${monthlyRegChartUrl})`,\n  '',\n  '_Counts reflect startup registration date only — not when use cases were submitted._',\n  '',\n  '---',\n  '',\n  '# AI USE CASE INTELLIGENCE',\n  '',\n  `**Total Use Cases:** ${useCaseStats.totalUseCases}`,\n  '',\n  statusLines,\n  '',\n  '## Top 10 Use Cases by Views',\n  `![Top Use Cases](${useCaseChartUrl})`,\n  '',\n  '## Use Case Monthly Trend',\n  `![Use Case Monthly Trend](${useCaseMonthlyChartUrl})`,\n  '',\n  '_Counts reflect use case creation date only — not when approval status changed._',\n  '',\n  '---',\n  '',\n  '# CUSTOMER INSIGHTS',\n  '',\n  `**Total Customers:** ${customerStats.totalCustomers}`,\n  `- Subscribed: ${customerStats.subscribed} (${conversionRate}% conversion)`,\n  `- Not subscribed: ${customerStats.notSubscribed}`,\n  '',\n  '## Customer Monthly Growth',\n  `![Customer Growth](${customerChartUrl})`,\n  ''\n].join('\\n');\n\nreturn [{ json: { canvasContent } }];"
+      },
+      "id": "2079d6f4-0469-42d4-90a1-bdcaa8010728",
+      "name": "Build Canvas Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Platform Statistics - Fully Automated (Charts, no Claude step)\n\nFetches startups/customers/use-cases -> computes stats -> renders REAL chart images via QuickChart.io -> uploads to Slack channel testing-channel -> replaces canvas <SLACK_ID> (new canvas, created for this workflow) with embedded charts.\n\nThis is a brand-new workflow. It does NOT modify or touch '1- Platform Statistics', '2- Favro Statistics', or '3- Google Analytics Statistics'.",
+        "height": 340,
+        "width": 588
+      },
+      "id": "30421423-79bd-4877-8003-d57bbc0c4d2a",
+      "name": "Sticky - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1888,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "content": "⚠️ API TOKEN EXPIRES ~AUG 7, 2026\n\nThis is a hardcoded JWT (same pattern as the original workflow). No login/refresh endpoint was found. Update this node's \"token\" value before it expires, or the daily run will fail silently.",
+        "height": 344,
+        "width": 260
+      },
+      "id": "c1f50ef7-f0d6-4a76-a4c2-c25f40272a39",
+      "name": "Sticky - Token Warning",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Chart rendering\n\nEach QuickChart node POSTs a Chart.js config to quickchart.io/chart (no auth needed) and gets back a real PNG. The Slack node then uploads that PNG and returns a permalink used in the final canvas markdown.",
+        "width": 460
+      },
+      "id": "9faa946d-d947-43e4-b74e-44335f54d4a1",
+      "name": "Sticky - Chart Pipeline",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/canvases.edit",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { canvas_id: \"<SLACK_ID>\", changes: [ { operation: \"replace\", document_content: { type: \"markdown\", markdown: $json.canvasContent } } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1984,
+        -80
+      ],
+      "id": "4cb2034e-7380-44bd-9aad-2f9956653e1e",
+      "name": "Replace Platform Statistics Canvas_Production",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const startups = $input.all().map(item => item.json);\n\nconst withCounts = startups.map(s => {\n  const cases = Array.isArray(s.cases) ? s.cases : [];\n  const approvedCount = cases.filter(c => (c.status || '').trim().toLowerCase() === 'approved').length;\n  return { name: s.name || 'Unknown', count: approvedCount };\n});\n\nconst sorted = withCounts.slice().sort((a, b) => b.count - a.count).slice(0, 10);\n\nconst labels = sorted.map(s => s.name);\nconst counts = sorted.map(s => s.count);\n\nconst chartConfig = {\n  chart: {\n    type: 'bar',\n    data: { labels, datasets: [{ label: 'Approved Use Cases', data: counts, backgroundColor: '#12B886' }] },\n    options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Top 10 startups by approved use cases linked' }, legend: { display: false } } }\n  },\n  width: 760,\n  height: 420,\n  backgroundColor: 'white',\n  format: 'png'\n};\n\nreturn [{\n  json: { stats: { topStartupsByUseCases: sorted }, chartConfig }\n}];"
+      },
+      "id": "28c60840-9d02-4b84-a799-ac7dab0f176c",
+      "name": "Compute Top Startups By UseCases & Chart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "8053ffbc-4d30-4fc7-a3ce-56f9c3e38ea4",
+      "name": "Render Top Startups Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        368,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "top_startups_by_usecases.png",
+          "title": "Top 10 startups by use cases linked"
+        }
+      },
+      "id": "975b4edf-ae16-4e6b-a472-cf290f015858",
+      "name": "Upload Top Startups Chart",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        592,
+        -384
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "6fa62289-0de3-4b2a-a2bc-72e008654db2",
+      "name": "Sync UseCases With Clean Startups",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -368,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "7e26a4a5-aa61-4d1a-a1f9-7818c72c3392",
+      "name": "Wait For Slack Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        -80
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cases = $input.all().map(item => item.json);\n\nconst monthlyCounts = {};\nfor (const c of cases) {\n  if (!c.createdAt) continue;\n  const d = new Date(c.createdAt);\n  if (isNaN(d.getTime())) continue;\n  const key = d.toISOString().slice(0, 7);\n  monthlyCounts[key] = (monthlyCounts[key] || 0) + 1;\n}\n\nconst months = Object.keys(monthlyCounts).sort();\nconst newCounts = months.map(m => monthlyCounts[m]);\nconst monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\nconst labels = months.map(m => {\n  const [y, mo] = m.split('-');\n  return monthNames[Number(mo) - 1] + ' ' + y.slice(2);\n});\n\nlet running = 0;\nconst cumulative = newCounts.map(c => { running += c; return running; });\n\nconst chartConfig = {\n  chart: {\n    type: 'bar',\n    data: {\n      labels,\n      datasets: [\n        {\n          type: 'bar',\n          label: 'New',\n          data: newCounts,\n          backgroundColor: '#1baf7a',\n          yAxisID: 'y-new'\n        },\n        {\n          type: 'line',\n          label: 'Cumulative',\n          data: cumulative,\n          borderColor: '#2a78d6',\n          backgroundColor: 'rgba(42,120,214,0.08)',\n          fill: true,\n          lineTension: 0.3,\n          pointRadius: 4,\n          pointBackgroundColor: '#2a78d6',\n          borderWidth: 2,\n          yAxisID: 'y-cumul'\n        }\n      ]\n    },\n    options: {\n      title: { display: true, text: 'Use Case Monthly Trend' },\n      legend: { display: true },\n      scales: {\n        yAxes: [\n          {\n            id: 'y-new',\n            type: 'linear',\n            position: 'left',\n            ticks: { beginAtZero: true },\n            scaleLabel: { display: true, labelString: 'New' }\n          },\n          {\n            id: 'y-cumul',\n            type: 'linear',\n            position: 'right',\n            ticks: { beginAtZero: true },\n            gridLines: { drawOnChartArea: false },\n            scaleLabel: { display: true, labelString: 'Total' }\n          }\n        ]\n      }\n    }\n  },\n  width: 700,\n  height: 380,\n  backgroundColor: 'white',\n  format: 'png'\n};\n\nreturn [{ json: { chartConfig } }];"
+      },
+      "id": "4334b474-7d5f-4502-8ed2-5f5be03281b0",
+      "name": "Compute UseCase Monthly Chart",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.chartConfig }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "93326afc-7524-426d-bcbf-a1087dd90e87",
+      "name": "Render UseCase Monthly Chart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        368,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "usecase_monthly_trend.png",
+          "title": "Use Case Monthly Trend"
+        }
+      },
+      "id": "c74fd7dc-ded5-4dcf-9c6c-d6f677997738",
+      "name": "Upload UseCase Monthly Chart",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        576,
+        608
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 07:00 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set API Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set API Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Startups",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Customers",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Use Case Views",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Startups": {
+      "main": [
+        [
+          {
+            "node": "Remove Test Startups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Customers": {
+      "main": [
+        [
+          {
+            "node": "Remove Test Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Test Startups": {
+      "main": [
+        [
+          {
+            "node": "Compute Startup Stats & Chart",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compute Country Stats & Chart",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compute Top Startups By UseCases & Chart",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sync UseCases With Clean Startups",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Remove Test Customers": {
+      "main": [
+        [
+          {
+            "node": "Compute Customer Stats & Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Test Use Cases": {
+      "main": [
+        [
+          {
+            "node": "Compute UseCase Stats & Chart",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compute UseCase Monthly Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Startup Stats & Chart": {
+      "main": [
+        [
+          {
+            "node": "Render Startup Growth Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Country Stats & Chart": {
+      "main": [
+        [
+          {
+            "node": "Render Country Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Customer Stats & Chart": {
+      "main": [
+        [
+          {
+            "node": "Render Customer Growth Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute UseCase Stats & Chart": {
+      "main": [
+        [
+          {
+            "node": "Render UseCase Views Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Startup Growth Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload Startup Growth Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Startup Growth Chart": {
+      "main": [
+        [
+          {
+            "node": "Combine All Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Country Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload Country Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Country Chart": {
+      "main": [
+        [
+          {
+            "node": "Combine All Branches",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Render Customer Growth Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload Customer Growth Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Customer Growth Chart": {
+      "main": [
+        [
+          {
+            "node": "Combine All Branches",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Render UseCase Views Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload UseCase Views Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload UseCase Views Chart": {
+      "main": [
+        [
+          {
+            "node": "Combine All Branches",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Build Canvas Content": {
+      "main": [
+        [
+          {
+            "node": "Replace Platform Statistics Canvas_Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Top Startups By UseCases & Chart": {
+      "main": [
+        [
+          {
+            "node": "Render Top Startups Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Top Startups Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload Top Startups Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Top Startups Chart": {
+      "main": [
+        [
+          {
+            "node": "Combine All Branches",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Fetch Use Case Views": {
+      "main": [
+        [
+          {
+            "node": "Sync UseCases With Clean Startups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync UseCases With Clean Startups": {
+      "main": [
+        [
+          {
+            "node": "Remove Test Use Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Branches": {
+      "main": [
+        [
+          {
+            "node": "Wait For Slack Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Slack Processing": {
+      "main": [
+        [
+          {
+            "node": "Build Canvas Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute UseCase Monthly Chart": {
+      "main": [
+        [
+          {
+            "node": "Render UseCase Monthly Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render UseCase Monthly Chart": {
+      "main": [
+        [
+          {
+            "node": "Upload UseCase Monthly Chart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload UseCase Monthly Chart": {
+      "main": [
+        [
+          {
+            "node": "Combine All Branches",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

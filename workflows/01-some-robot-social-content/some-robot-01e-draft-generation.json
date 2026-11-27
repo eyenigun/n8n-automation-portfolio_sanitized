@@ -1,0 +1,691 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "SoMe Robot - 01e Draft Generation",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "ca799c34-fe86-4cb8-8c17-785ea01e87d7",
+      "name": "Daily Trigger (9am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -464,
+        304
+      ],
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>",
+          "cachedResultName": "some_robot_content"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "Approved"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "09a3771f-09e5-43e9-af5d-b5469338a65d",
+      "name": "Get Approved Topics",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "cachedResultName": "GPT-5.5",
+          "mode": "list",
+          "value": "gpt-5.5"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are the social media content strategist for SolveStack AI, a company that builds AI-powered automation and AI agent solutions for businesses.\n\nBRAND VOICE (v1 - hardcoded for MVP, refine later):\n- Tone: confident, practical, approachable. Not hypey, not buzzword-soup.\n- Audience: business and tech leaders evaluating AI automation for their teams.\n- Style: clear, concrete, occasionally a little playful, never salesy.\n- Avoid: cliches like \"game-changer\" / \"revolutionize\" / \"unlock the power of\", excessive exclamation points, emoji spam.\n- Always ground claims in the specific topic given - no generic filler.\n\nFor the topic you are given, produce platform-agnostic content: the core message, angle, and key points a human will later adapt per platform (LinkedIn, X, etc). Also produce a short text brief describing an accompanying visual concept (a text description only, not an image).\n\nReturn ONLY a JSON object in this exact shape:\n{ \"core_content\": \"3-6 sentences: the angle, key points, and a suggested opening hook\", \"image_brief\": \"1-2 sentences describing a relevant visual concept\" }"
+            },
+            {
+              "content": "=Topic: {{ $json.topic }}\nRationale: {{ $json.topic_rationale }}\nSource: {{ $json.source }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 800,
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "id": "a69b4047-a8c4-4def-91ee-8580ea1254b1",
+      "name": "Draft Content",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "<your openAiApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const parsed = $json.output?.[0]?.content?.[0]?.text;\n\nif (!parsed || typeof parsed !== 'object') {\n  throw new Error('No parsed JSON object found in LLM response.');\n}\n\nreturn {\n  json: {\n    topicId: $('Get Approved Topics').item.json.id,\n    core_content: parsed.core_content || '',\n    image_brief: parsed.image_brief || ''\n  }\n};"
+      },
+      "id": "1df1f35a-0737-4a35-bf12-0ec1cb6096f1",
+      "name": "Parse Draft Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "cachedResultName": "some_robot_content",
+          "mode": "list",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Parse Draft Output').item.json.topicId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "core_content": "={{ $('Parse Draft Output').item.json.core_content }}",
+            "image_brief": "={{ $('Parse Draft Output').item.json.image_brief }}",
+            "image_url": "={{ $('Upload Image to Slack').item.json.permalink }}",
+            "status": "Draft Ready"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "topic",
+              "id": "topic",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "topic_rationale",
+              "id": "topic_rationale",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "core_content",
+              "id": "core_content",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "image_brief",
+              "id": "image_brief",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target_linkedin",
+              "id": "target_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target_x",
+              "id": "target_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content_linkedin",
+              "id": "content_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content_x",
+              "id": "content_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "approved_linkedin",
+              "id": "approved_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "approved_x",
+              "id": "approved_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "scheduled_date",
+              "id": "scheduled_date",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "dateTime"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "published_linkedin",
+              "id": "published_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "published_x",
+              "id": "published_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "publish_error",
+              "id": "publish_error",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "image_url",
+              "id": "image_url",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3376de93-9180-44ff-b692-5d8d370172f2",
+      "name": "Update Draft Ready",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1904,
+        400
+      ],
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "content": "## SoMe Robot - 01e Draft Generation\n\nRuns daily. Pulls status=Approved topics, drafts platform-agnostic core_content + an image_brief via LLM, generates an image from that brief (OpenAI gpt-image-1-mini), uploads it to Slack (#03-cmo-promotion-doing) for a persistent URL, writes everything back and flips status to \"Draft Ready\" (awaiting the second human review loop - not yet built).\n\nBrand voice is hardcoded in the Draft Content system prompt for MVP - flagged for improvement later (move to editable doc/table once tone needs frequent tuning).\n\nimage_url stores the Slack file permalink (not a raw image) - viewing it requires Slack auth, which is fine since the team already lives in that workspace.",
+        "height": 252,
+        "width": 1500,
+        "color": 4
+      },
+      "id": "f6edaaac-e9f9-40b5-a3f7-9ebd78422628",
+      "name": "Sticky Note 0406ca9d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-image-1-mini"
+        },
+        "prompt": "={{ $json.image_brief }}",
+        "options": {
+          "quality": "medium",
+          "size": "1024x1024"
+        }
+      },
+      "id": "b3369e84-0852-4da1-abcd-3cfe4ded72fd",
+      "name": "Generate Image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "<your openAiApi>"
+        }
+      },
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "channelId": "<SLACK_ID>",
+          "fileName": "={{ 'topic-' + $('Parse Draft Output').item.json.topicId + '-image.png' }}",
+          "initialComment": "={{ 'Draft image for: ' + $('Get Approved Topics').item.json.topic }}",
+          "title": "={{ $('Get Approved Topics').item.json.topic }}"
+        }
+      },
+      "id": "74bf23a6-1789-4c4e-8a37-dbe423afb9a9",
+      "name": "Upload Image to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        784,
+        400
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      },
+      "disabled": false
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        496
+      ],
+      "id": "1afd2435-d3e7-4cf6-ad2d-fcd2f24354a2",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "SoMe Robot - 01j Refresh Status Board"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "e6acc6d5-873e-435e-b5da-d503ca242e98",
+      "name": "Refresh Status Board",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2128,
+        304
+      ],
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "SoMe Robot - 01f Draft Review",
+          "mode": "list",
+          "value": "<WORKFLOW_ID>"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "f1e2d3c4-5b6a-4978-8e9f-0a1b2c3d4e5f",
+      "name": "Trigger Draft Review",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2128,
+        496
+      ],
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "url": "=https://slack.com/api/files.info?file={{ $('Upload Image to Slack').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "options": {}
+      },
+      "id": "fee24cfc-b283-4526-ae4d-deedafe00a02",
+      "name": "Get File Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1232,
+        400
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      },
+      "notes": "Fetches the uploaded file's share info so we can find the ts of the auto-posted upload announcement and delete just that message (keeping the file itself shared to the channel so its permalink stays viewable).",
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const file = $json.file || {};\nconst shares = file.shares || {};\nconst channelId = '<SLACK_ID>';\nlet ts = null;\nif (shares.public && shares.public[channelId] && shares.public[channelId][0]) {\n  ts = shares.public[channelId][0].ts;\n} else if (shares.private && shares.private[channelId] && shares.private[channelId][0]) {\n  ts = shares.private[channelId][0].ts;\n}\nreturn { json: { channel: channelId, ts } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "f772d0b2-f0f8-4827-a80f-4688d1cdff55",
+      "name": "Extract Upload Message Ts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        400
+      ],
+      "notes": "Finds the ts of the message Slack auto-posted when the file was shared to the review channel, so it can be deleted next.",
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.delete",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $json.channel, ts: $json.ts }) }}",
+        "options": {}
+      },
+      "id": "ae567716-c5cc-4abd-a402-495886405201",
+      "name": "Delete Image Upload Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        400
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Deletes the auto-posted upload announcement so the image only appears once, via the unfurled permalink in the draft review message. Errors here (e.g. ts not found yet) don't block the pipeline.",
+      "disabled": false
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "ba9e98b0-2cde-4aa4-a284-420704a8c5b5",
+      "name": "Wait for Share to Register",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1008,
+        400
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "notes": "Slack's files.info can return an empty 'shares' object if queried immediately after upload -- the share metadata takes a moment to propagate. This short wait avoids a race condition that left the redundant upload announcement undeleted.",
+      "disabled": false
+    }
+  ],
+  "connections": {
+    "Daily Trigger (9am)": {
+      "main": [
+        [
+          {
+            "node": "Get Approved Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Approved Topics": {
+      "main": [
+        [
+          {
+            "node": "Draft Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Content": {
+      "main": [
+        [
+          {
+            "node": "Parse Draft Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Draft Output": {
+      "main": [
+        [
+          {
+            "node": "Generate Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image to Slack": {
+      "main": [
+        [
+          {
+            "node": "Wait for Share to Register",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Approved Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Draft Ready": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trigger Draft Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Info": {
+      "main": [
+        [
+          {
+            "node": "Extract Upload Message Ts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Upload Message Ts": {
+      "main": [
+        [
+          {
+            "node": "Delete Image Upload Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Image Upload Message": {
+      "main": [
+        [
+          {
+            "node": "Update Draft Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Share to Register": {
+      "main": [
+        [
+          {
+            "node": "Get File Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

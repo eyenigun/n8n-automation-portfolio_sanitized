@@ -1,0 +1,865 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "4- AWS Daily Report Stats — Production",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const msg = $json;\n\nfunction blockText(block) {\n  const parts = [];\n  if (block.text && block.text.text) parts.push(block.text.text);\n  if (block.fields) block.fields.forEach(f => { if (f.text) parts.push(f.text); });\n  if (block.elements) block.elements.forEach(e => { if (e.text) parts.push(e.text); });\n  return parts.join('\\n');\n}\n\nfunction fullText(m) {\n  if (!m.blocks) return m.text || '';\n  return m.blocks.map(blockText).join('\\n');\n}\n\nconst HEADINGS = ['Entities', 'API traffic', 'Emails', 'Suspicious activity', 'Estimated AWS cost'];\n\nfunction extractSection(text, heading, nextHeadings) {\n  const esc = s => s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n  const startRe = new RegExp('\\\\*' + esc(heading) + '\\\\*');\n  const startMatch = startRe.exec(text);\n  if (!startMatch) return '';\n  const startIdx = startMatch.index + startMatch[0].length;\n  let endIdx = text.length;\n  for (const h of nextHeadings) {\n    const re = new RegExp('\\\\*' + esc(h) + '\\\\*');\n    const m = re.exec(text.slice(startIdx));\n    if (m) {\n      const idx = startIdx + m.index;\n      if (idx < endIdx) endIdx = idx;\n    }\n  }\n  return text.slice(startIdx, endIdx);\n}\n\nfunction parseEntities(sec) {\n  const rows = {};\n  const re = /^(Customers|Startups|Cases)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([+-]?\\d+)/gm;\n  let m;\n  while ((m = re.exec(sec))) {\n    rows[m[1]] = { total: +m[2], active: +m[3], deleted: +m[4], last7d: +m[5] };\n  }\n  return rows;\n}\n\nfunction parseTraffic(sec) {\n  const last7 = /Last 7 days\\*\\s*\\n(\\d[\\d,]*)\\s*requests/.exec(sec);\n  const month = /This month\\*\\s*\\n(\\d[\\d,]*)\\s*requests/.exec(sec);\n  const compact = /last 7 days:\\s*\\*(\\d[\\d,]*)\\*[\\s\\S]*?this month:\\s*\\*(\\d[\\d,]*)\\*/.exec(sec);\n  const functions = {};\n  const fnRe = /^(\\S+Function)\\s+(\\d+)\\s+([\\d,]+)$/gm;\n  let m;\n  while ((m = fnRe.exec(sec))) {\n    functions[m[1]] = +m[2];\n  }\n  return {\n    last7dRequests: last7 ? +last7[1].replace(/,/g, '') : (compact ? +compact[1].replace(/,/g, '') : null),\n    monthRequests: month ? +month[1].replace(/,/g, '') : (compact ? +compact[2].replace(/,/g, '') : null),\n    functions\n  };\n}\n\nfunction parseTrafficDaily(sec) {\n  const days = [];\n  const re = /^(\\w{3})\\s+(\\d{2}-\\d{2})\\s+[█░]+\\s+(\\d+)\\s*$/gm;\n  let m;\n  while ((m = re.exec(sec))) {\n    days.push({ dow: m[1], date: m[2], requests: +m[3] });\n  }\n  return days;\n}\n\nfunction parseEmails(sec) {\n  const types = {};\n  const lines = sec.split('\\n');\n  const rowRe = /^(.{3,}?)\\s{2,}(\\d+)\\s+(\\d+)$/;\n  lines.forEach(line => {\n    const m = rowRe.exec(line);\n    if (m && !/^Type\\s/.test(m[1])) {\n      types[m[1].trim()] = +m[2];\n    }\n  });\n  return types;\n}\n\nfunction parseSuspicious(sec) {\n  const alerts = [];\n  const alertRe = /:(red_circle|large_orange_circle|white_circle):\\s*\\*(\\d+)\\*\\s*([^\\n]+)/g;\n  let m;\n  while ((m = alertRe.exec(sec))) {\n    alerts.push({ severity: m[1], count: +m[2], description: m[3].trim() });\n  }\n  const ips = [];\n  const ipRe = /^(\\d{1,3}(?:\\.\\d{1,3}){3})\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)$/gm;\n  while ((m = ipRe.exec(sec))) {\n    ips.push({ ip: m[1], requests: +m[2], err4xx: +m[3], err5xx: +m[4], throttled429: +m[5] });\n  }\n  return {\n    alerts,\n    topIps: ips,\n    total5xx: alerts.filter(a => /5xx/i.test(a.description)).reduce((s, a) => s + a.count, 0),\n    total429: alerts.filter(a => /429/.test(a.description)).reduce((s, a) => s + a.count, 0),\n    total4xx: ips.reduce((s, ip) => s + ip.err4xx, 0)\n  };\n}\n\nfunction parseCost(sec) {\n  if (/Unavailable/i.test(sec)) return { available: false };\n  const mtd = /Month to date\\*\\s*\\n\\$([\\d.,]+)/.exec(sec) || /Total \\*\\$([\\d.,]+)\\*/.exec(sec);\n  const projected = /Projected month end\\*\\s*\\n\\$([\\d.,]+)/.exec(sec) || /projected month end \\*\\$([\\d.,]+)\\*/.exec(sec);\n  return {\n    available: true,\n    monthToDate: mtd ? +mtd[1].replace(/,/g, '') : null,\n    projectedMonthEnd: projected ? +projected[1].replace(/,/g, '') : null\n  };\n}\n\nconst text = msg.text || '';\nconst dateMatch = /—\\s*(\\d{4}-\\d{2}-\\d{2})/.exec(text);\nconst date = dateMatch ? dateMatch[1] : new Date(parseFloat(msg.ts) * 1000).toISOString().slice(0, 10);\nconst full = fullText(msg);\n\nconst entities = parseEntities(extractSection(full, 'Entities', HEADINGS.filter(h => h !== 'Entities')));\nconst trafficSec = extractSection(full, 'API traffic', HEADINGS.filter(h => h !== 'API traffic'));\nconst traffic = parseTraffic(trafficSec);\nconst trafficDaily = parseTrafficDaily(trafficSec);\nconst emailTypes = parseEmails(extractSection(full, 'Emails', HEADINGS.filter(h => h !== 'Emails')));\nconst suspicious = parseSuspicious(extractSection(full, 'Suspicious activity', HEADINGS.filter(h => h !== 'Suspicious activity')));\nconst cost = parseCost(extractSection(full, 'Estimated AWS cost', HEADINGS.filter(h => h !== 'Estimated AWS cost')));\n\nconst topIp = [...suspicious.topIps].sort((a, b) => b.requests - a.requests)[0] || {};\n\n// Identify the IP(s) actually responsible for 5xx errors (may differ from the top-traffic IP)\nconst top5xxIps = [...suspicious.topIps].filter(ip => ip.err5xx > 0).sort((a, b) => b.err5xx - a.err5xx).slice(0, 5);\nconst top5xxIp = top5xxIps[0] || {};\n\nreturn [{\n  json: {\n    reportDate: date,\n    messageTs: msg.ts,\n    last7dRequests: traffic.last7dRequests,\n    monthRequests: traffic.monthRequests,\n    total5xx: suspicious.total5xx,\n    total429: suspicious.total429,\n    total4xx: suspicious.total4xx,\n    alertCount: suspicious.alerts.length,\n    costMtd: cost.available ? cost.monthToDate : null,\n    costProjected: cost.available ? cost.projectedMonthEnd : null,\n    customersTotal: entities.Customers ? entities.Customers.total : null,\n    startupsTotal: entities.Startups ? entities.Startups.total : null,\n    casesTotal: entities.Cases ? entities.Cases.total : null,\n    topIp: topIp.ip || null,\n    topIpRequests: topIp.requests || null,\n    top5xxIp: top5xxIp.ip || null,\n    top5xxIpErr5xx: top5xxIp.err5xx || null,\n    top5xxIpRequests: top5xxIp.requests || null,\n    top5xxBreakdownJson: JSON.stringify(top5xxIps),\n    lambdaFunctionsJson: JSON.stringify(traffic.functions),\n    emailTypesJson: JSON.stringify(emailTypes),\n    trafficDailyJson: JSON.stringify(trafficDaily)\n  }\n}];"
+      },
+      "id": "30779071-ea11-4cc7-92a1-18f0a176b5b5",
+      "name": "Parse Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": []
+        },
+        "limit": 8,
+        "orderBy": true
+      },
+      "id": "57d29154-9dc5-4b95-bbb3-fa5d79032a4f",
+      "name": "Get Recent History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1136,
+        160
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $('Parse Report').first().json;\nconst history = $input.all().map(i => i.json).filter(r => r.reportDate !== current.reportDate);\n\nfunction avg(arr, key) {\n  const vals = arr.map(r => r[key]).filter(v => typeof v === 'number');\n  if (!vals.length) return null;\n  return vals.reduce((a, b) => a + b, 0) / vals.length;\n}\n\nconst avg5xx = avg(history, 'total5xx');\nconst avgCost = avg(history, 'costMtd');\nconst avgMonthReq = avg(history, 'monthRequests');\n\nconst reasons = [];\n\nif (avg5xx !== null && current.total5xx > avg5xx * 2 && (current.total5xx - avg5xx) >= 10) {\n  let reason = '5xx errors (' + current.total5xx + ') more than 2x the trailing average (' + avg5xx.toFixed(1) + ')';\n  if (current.top5xxIp) {\n    reason += ' — top offender: ' + current.top5xxIp + ' (' + current.top5xxIpErr5xx + ' of the 5xx, ' + current.top5xxIpRequests + ' total reqs today)';\n  }\n  reasons.push(reason);\n}\nif (avgCost !== null && current.costMtd !== null && avgCost > 0 && current.costMtd > avgCost * 1.5) {\n  reasons.push('Cost MTD ($' + current.costMtd + ') is 50%+ above trailing average ($' + avgCost.toFixed(2) + ')');\n}\nif (avgMonthReq !== null && current.monthRequests !== null && avgMonthReq > 0 && current.monthRequests > avgMonthReq * 3) {\n  reasons.push('Monthly request volume spiked to ' + current.monthRequests + ' vs average ' + avgMonthReq.toFixed(0));\n}\nconst knownIps = new Set(history.map(r => r.topIp).filter(Boolean));\nif (current.topIp && history.length >= 3 && !knownIps.has(current.topIp)) {\n  reasons.push('New top offending IP not seen in recent history: ' + current.topIp + ' (' + current.topIpRequests + ' reqs)');\n}\n\nreturn [{\n  json: Object.assign({}, current, {\n    anomalyFlag: reasons.length > 0,\n    anomalyReason: reasons.join(' | ')\n  })\n}];"
+      },
+      "id": "c03f6324-96d2-4406-a096-d1b2e1f3cd67",
+      "name": "Detect Anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<DATA_TABLE_ID>",
+          "cachedResultName": "aws_daily_report_stats"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "reportDate",
+              "keyValue": "={{ $json.reportDate }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "reportDate": "={{ $json.reportDate }}",
+            "messageTs": "={{ $json.messageTs }}",
+            "last7dRequests": "={{ $json.last7dRequests }}",
+            "monthRequests": "={{ $json.monthRequests }}",
+            "total5xx": "={{ $json.total5xx }}",
+            "total429": "={{ $json.total429 }}",
+            "total4xx": "={{ $json.total4xx }}",
+            "alertCount": "={{ $json.alertCount }}",
+            "costMtd": "={{ $json.costMtd }}",
+            "costProjected": "={{ $json.costProjected }}",
+            "customersTotal": "={{ $json.customersTotal }}",
+            "startupsTotal": "={{ $json.startupsTotal }}",
+            "casesTotal": "={{ $json.casesTotal }}",
+            "topIp": "={{ $json.topIp }}",
+            "topIpRequests": "={{ $json.topIpRequests }}",
+            "anomalyFlag": "={{ $json.anomalyFlag }}",
+            "anomalyReason": "={{ $json.anomalyReason }}",
+            "lambdaFunctionsJson": "={{ $json.lambdaFunctionsJson }}",
+            "emailTypesJson": "={{ $json.emailTypesJson }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "reportDate",
+              "displayName": "reportDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "messageTs",
+              "displayName": "messageTs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last7dRequests",
+              "displayName": "last7dRequests",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "monthRequests",
+              "displayName": "monthRequests",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total5xx",
+              "displayName": "total5xx",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total429",
+              "displayName": "total429",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "alertCount",
+              "displayName": "alertCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "costMtd",
+              "displayName": "costMtd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "costProjected",
+              "displayName": "costProjected",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "customersTotal",
+              "displayName": "customersTotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "startupsTotal",
+              "displayName": "startupsTotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "casesTotal",
+              "displayName": "casesTotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topIp",
+              "displayName": "topIp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topIpRequests",
+              "displayName": "topIpRequests",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "anomalyFlag",
+              "displayName": "anomalyFlag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "anomalyReason",
+              "displayName": "anomalyReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "lambdaFunctionsJson",
+              "displayName": "lambdaFunctionsJson",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "emailTypesJson",
+              "displayName": "emailTypesJson",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "total4xx",
+              "displayName": "total4xx",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "cf07157a-4a6b-4c0e-a224-d0798547a982",
+      "name": "Store Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1584,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Store Row').first().json.anomalyFlag }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "rightValue": true,
+              "id": "944b8740-1678-4bef-8f94-de9789240db5"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4da2d3d8-5eaf-44bb-a4ed-756eebc3c2b8",
+      "name": "Is Anomaly",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3376,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<SLACK_ID>"
+        },
+        "text": "=:rotating_light: Anomaly detected in AWS report for {{ $('Detect Anomaly').first().json.reportDate }}\n{{ $('Detect Anomaly').first().json.anomalyReason }}\n\n{{ $('Detect Anomaly').first().json.top5xxIp ? 'CloudWatch Logs Insights (adjust log group):\\n```\\nfields @timestamp, @message\\n| filter @message like /' + $('Detect Anomaly').first().json.top5xxIp + '/\\n| filter @message like /5\\\\d\\\\d/\\n| sort @timestamp desc\\n| limit 50\\n```' : '' }}\n\nBusiest functions today: {{ Object.entries(JSON.parse($('Detect Anomaly').first().json.lambdaFunctionsJson || '{}')).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+' ('+v+')').join(', ') }}",
+        "otherOptions": {}
+      },
+      "id": "79cea5a8-746f-4cc0-a14e-fc3cd4dd3b3c",
+      "name": "Post Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        3616,
+        128
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "6589e7b0-5c09-42c0-8554-b5bbec328e56",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "history",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<SLACK_ID>"
+        },
+        "limit": 20,
+        "filters": {}
+      },
+      "id": "ba8acd42-c7a0-4925-89f4-b9fcd72d6de6",
+      "name": "Get Latest Channel History",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        464,
+        160
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = $input.all().map(i => i.json);\nconst reports = messages.filter(m => (m.text || '').startsWith('SolveStack stats report'));\nif (!reports.length) return [];\nreports.sort((a, b) => parseFloat(b.ts) - parseFloat(a.ts));\nreturn [{ json: reports[0] }];"
+      },
+      "id": "978d2685-82fa-410c-aafe-174c4ad96e05",
+      "name": "Pick Latest Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const images = $json.images || [];\nconst current = $('Store Row').first().json;\nconst historyRaw = $('Get Recent History').all().map(i => i.json);\nconst map = {};\nhistoryRaw.forEach(r => { map[r.reportDate] = r; });\nmap[current.reportDate] = current;\nconst rows = Object.values(map).sort((a, b) => a.reportDate.localeCompare(b.reportDate)).slice(-7);\n\nfunction fmtNum(v) { return (v === null || v === undefined) ? '—' : v; }\nfunction imgFor(key) { const i = images.find(x => x.key === key); return i ? i.permalink : ''; }\n\nconst now = new Date();\nconst pad = n => String(n).padStart(2, '0');\nconst generatedAt = now.getUTCFullYear() + '-' + pad(now.getUTCMonth() + 1) + '-' + pad(now.getUTCDate()) + ' ' + pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ' UTC';\n\nconst topIpLines = rows.map(r => '- ' + r.reportDate + ': ' + (r.topIp || '—') + ' (' + fmtNum(r.topIpRequests) + ' requests)').join('\\n');\n\nconst chartDefinitions = '### What each chart shows\\n' +\n  '- **API traffic**: real daily request counts for the trailing 7 days, read directly from the latest report’s own per-day breakdown (not accumulated across days).\\n' +\n  '- **Busiest Lambda functions**: 7-day call counts for the top Lambda functions by traffic.\\n' +\n  '- **Emails sent**: 7-day counts of emails sent, broken down by email type.\\n' +\n  '- **Suspicious activity**: daily counts of 5xx errors (server-side failures, usually a Lambda/app bug or crash — worth checking error logs), 4xx errors (client-side errors like 403/404, most often scanner or bot traffic hitting invalid or forbidden paths), and 429s (requests rejected by rate limiting, meaning a client or IP hit too many requests too fast).\\n' +\n  '- **Top offending IP by day**: the single IP address with the highest request count in each day’s Suspicious activity table, along with how many requests it made that day. A repeat entry across multiple days means the same source kept showing up as the top talker; a new IP appearing here (especially one not seen in the recent history) is what triggers the anomaly detector’s “new top offending IP” rule.\\n' +\n  '- **Estimated AWS cost**: month-to-date spend and the projected cost by month end.\\n';\n\nconst anomalyCriteria = '### When is a day flagged as an anomaly?\\n' +\n  'A day is flagged if any of the following hold, compared against the trailing average of the prior stored days:\\n' +\n  '- **5xx errors**: more than 2x the trailing average, and at least 10 more in absolute terms\\n' +\n  '- **Cost (MTD)**: more than 1.5x the trailing average\\n' +\n  '- **Monthly request volume**: more than 3x the trailing average\\n' +\n  '- **Top offending IP**: a new IP not seen as the top IP in at least 3 of the prior stored days\\n';\n\nconst anomalyResult = current.anomalyFlag\n  ? '### Anomaly result for ' + current.reportDate + '\\n:rotating_light: **Anomaly detected** — ' + current.anomalyReason\n  : '### Anomaly result for ' + current.reportDate + '\\n:white_check_mark: **No anomaly detected** — all metrics within normal range.';\n\nconst markdown = '## AWS reports — trend\\n' +\n  '_Report date ' + current.reportDate + ' · generated ' + generatedAt + ' · last ' + rows.length + ' days_\\n\\n' +\n  chartDefinitions + '\\n' +\n  '### API traffic\\n![API traffic](' + imgFor('traffic') + ')\\n\\n' +\n  '### Busiest Lambda functions (7d call count)\\n![Busiest Lambda functions](' + imgFor('lambda') + ')\\n\\n' +\n  '### Emails sent (7d count)\\n![Emails sent](' + imgFor('emails') + ')\\n\\n' +\n  '### Suspicious activity\\n![Suspicious activity](' + imgFor('suspicious') + ')\\n\\nTop offending IP by day:\\n' + topIpLines + '\\n\\n' +\n  '### Estimated AWS cost\\n![Estimated AWS cost](' + imgFor('cost') + ')\\n\\n' +\n  anomalyCriteria + '\\n' + anomalyResult;\n\nreturn [{ json: { markdown } }];"
+      },
+      "id": "5ebbcabd-a66b-4f84-9662-b3f5a8a197aa",
+      "name": "Build Canvas Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "id": "77d4e4ec-fa31-40b9-ab07-04d81708bcd0",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        256
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $json;\nconst historyRaw = $('Get Recent History').all().map(i => i.json);\nconst map = {};\nhistoryRaw.forEach(r => { map[r.reportDate] = r; });\nmap[current.reportDate] = current;\nconst rows = Object.values(map).sort((a, b) => a.reportDate.localeCompare(b.reportDate)).slice(-7);\n\nfunction parseJson(s) { if (!s) return {}; try { return JSON.parse(s); } catch (e) { return {}; } }\n\nconst labels = rows.map(r => r.reportDate);\n\nlet lambdaKeys = [];\nlet emailKeys = [];\nfor (let i = rows.length - 1; i >= 0; i--) {\n  const lf = parseJson(rows[i].lambdaFunctionsJson);\n  if (Object.keys(lf).length && !lambdaKeys.length) lambdaKeys = Object.keys(lf).slice(0, 4);\n  const em = parseJson(rows[i].emailTypesJson);\n  if (Object.keys(em).length && !emailKeys.length) emailKeys = Object.keys(em).slice(0, 4);\n}\n\nconst colors = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed'];\n\nconst charts = [];\n\nconst trafficDailyRaw = $('Parse Report').first().json.trafficDailyJson;\nlet trafficDaily = [];\ntry { trafficDaily = JSON.parse(trafficDailyRaw || '[]'); } catch (e) { trafficDaily = []; }\nconst trafficLabels = trafficDaily.map(d => d.dow + ' ' + d.date);\nconst trafficValues = trafficDaily.map(d => d.requests);\n\ncharts.push({\n  key: 'traffic',\n  title: 'API traffic (daily requests, from latest report)',\n  fileName: 'api-traffic.png',\n  chartConfig: {\n    type: 'bar',\n    data: { labels: trafficLabels, datasets: [\n      { label: 'Requests', data: trafficValues, backgroundColor: colors[0] }\n    ] },\n    options: { plugins: { title: { display: true, text: 'API traffic — daily requests' } } }\n  }\n});\n\ncharts.push({\n  key: 'lambda',\n  title: 'Busiest Lambda functions (7d call count)',\n  fileName: 'lambda-functions.png',\n  chartConfig: {\n    type: 'bar',\n    data: { labels, datasets: lambdaKeys.map((k, i) => ({ label: k, data: rows.map(r => { const lf = parseJson(r.lambdaFunctionsJson); return lf[k] ?? 0; }), backgroundColor: colors[i % colors.length] })) },\n    options: { plugins: { title: { display: true, text: 'Busiest Lambda functions' } } }\n  }\n});\n\ncharts.push({\n  key: 'emails',\n  title: 'Emails sent (7d count)',\n  fileName: 'emails-sent.png',\n  chartConfig: {\n    type: 'bar',\n    data: { labels, datasets: emailKeys.map((k, i) => ({ label: k, data: rows.map(r => { const em = parseJson(r.emailTypesJson); return em[k] ?? 0; }), backgroundColor: colors[i % colors.length] })) },\n    options: { plugins: { title: { display: true, text: 'Emails sent' } } }\n  }\n});\n\ncharts.push({\n  key: 'suspicious',\n  title: 'Suspicious activity (4xx / 5xx / 429)',\n  fileName: 'suspicious-activity.png',\n  chartConfig: {\n    type: 'bar',\n    data: { labels, datasets: [\n      { label: '5xx errors', data: rows.map(r => r.total5xx), backgroundColor: colors[1] },\n      { label: '4xx errors', data: rows.map(r => r.total4xx), backgroundColor: colors[0] },\n      { label: '429 rate-limited', data: rows.map(r => r.total429), backgroundColor: colors[3] }\n    ] },\n    options: { plugins: { title: { display: true, text: 'Suspicious activity' } } }\n  }\n});\n\ncharts.push({\n  key: 'cost',\n  title: 'Estimated AWS cost',\n  fileName: 'aws-cost.png',\n  chartConfig: {\n    type: 'line',\n    data: { labels, datasets: [\n      { label: 'Month to date ($)', data: rows.map(r => (r.costMtd === null || r.costMtd === undefined) ? null : r.costMtd), borderColor: colors[2], backgroundColor: colors[2], fill: false },\n      { label: 'Projected month end ($)', data: rows.map(r => (r.costProjected === null || r.costProjected === undefined) ? null : r.costProjected), borderColor: colors[4], backgroundColor: colors[4], fill: false }\n    ] },\n    options: { plugins: { title: { display: true, text: 'Estimated AWS cost' } } }\n  }\n});\n\nreturn charts.map(c => ({ json: c }));"
+      },
+      "id": "739eef37-4d92-4195-8033-b321a02b5621",
+      "name": "Build Chart Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "images",
+        "options": {}
+      },
+      "id": "751dfeeb-60ca-44e2-bbba-b0d98f7f2b79",
+      "name": "Aggregate Chart Uploads",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2480,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chart: $json.chartConfig, width: 600, height: 320, backgroundColor: 'white', format: 'png' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "e1ebd9e6-d898-4b99-a1e7-c1db11203bf2",
+      "name": "Render Chart PNG",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2032,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $('Build Chart Items').item.json;\nreturn {\n  json: {\n    key: original.key,\n    title: original.title,\n    permalink: $json.permalink\n  }\n};"
+      },
+      "id": "cfbc41ed-083b-46a7-9df0-56ee0fff1f28",
+      "name": "Merge Chart URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/canvases.edit",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": {
+          "canvas_id": "={{ $json.canvas_id }}",
+          "changes": "={{ $json.changes }}"
+        },
+        "options": {}
+      },
+      "id": "b9a22c78-2c31-4881-8227-641573a5cbc4",
+      "name": "Replace Entire Canvas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3152,
+        160
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const markdown = $('Build Canvas Markdown').first().json.markdown;\nreturn [{ json: { canvas_id: '<SLACK_ID>', changes: [{ operation: 'replace', document_content: { type: 'markdown', markdown } }] } }];"
+      },
+      "id": "09347006-2c33-464b-998b-a3107f75e40f",
+      "name": "Build Replace Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "<SLACK_ID>",
+          "mode": "list",
+          "cachedResultName": "testing-channel"
+        },
+        "text": "=AWS Daily availability statistics (API traffic, emails sent, Busiest Lambda functions, Suspicious activity and Top offending IPs) - n8n automation flow daily run completed",
+        "otherOptions": {
+          "includeLinkToWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        3488,
+        -64
+      ],
+      "id": "e5e2164d-f2e0-49ed-8d01-c0ca4f8d70b1",
+      "name": "Send_message (Flow run)_Testıng",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "executeOnce": true,
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "6a835c31-645e-4ae8-9541-c0aa8c2b60ed",
+      "name": "API Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "options": {
+          "fileName": "={{ $('Build Chart Items').item.json.fileName }}",
+          "title": "={{ $('Build Chart Items').item.json.title }}"
+        }
+      },
+      "id": "b838c921-21a4-4d3f-bcca-5ed507bf7635",
+      "name": "Upload Chart to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        2144,
+        384
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "f124ec77-7254-4a4a-911d-0042b014aae2",
+      "name": "Wait For Slack Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2256,
+        384
+      ],
+      "webhookId": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "connections": {
+    "Parse Report": {
+      "main": [
+        [
+          {
+            "node": "Get Recent History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent History": {
+      "main": [
+        [
+          {
+            "node": "Detect Anomaly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Anomaly": {
+      "main": [
+        [
+          {
+            "node": "Store Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Anomaly": {
+      "main": [
+        [
+          {
+            "node": "Post Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Channel History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Channel History": {
+      "main": [
+        [
+          {
+            "node": "Pick Latest Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Latest Report": {
+      "main": [
+        [
+          {
+            "node": "Parse Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Channel History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Row": {
+      "main": [
+        [
+          {
+            "node": "Build Chart Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Chart Uploads": {
+      "main": [
+        [
+          {
+            "node": "Build Canvas Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Chart Items": {
+      "main": [
+        [
+          {
+            "node": "Render Chart PNG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Chart URL": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Chart Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Replace Payload": {
+      "main": [
+        [
+          {
+            "node": "Replace Entire Canvas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Entire Canvas": {
+      "main": [
+        [
+          {
+            "node": "Is Anomaly",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send_message (Flow run)_Testıng",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Canvas Markdown": {
+      "main": [
+        [
+          {
+            "node": "Build Replace Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Channel History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Chart PNG": {
+      "main": [
+        [
+          {
+            "node": "Upload Chart to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Chart to Slack": {
+      "main": [
+        [
+          {
+            "node": "Wait For Slack Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Slack Processing": {
+      "main": [
+        [
+          {
+            "node": "Merge Chart URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

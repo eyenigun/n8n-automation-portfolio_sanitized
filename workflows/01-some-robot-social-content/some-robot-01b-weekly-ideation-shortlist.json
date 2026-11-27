@@ -1,0 +1,1390 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "SoMe Robot - 01b Weekly Ideation Shortlist",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "ddafdaca-1691-4b27-978f-b8d1367b980a",
+      "name": "Weekly Trigger (Mon 8am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1072,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "options": {}
+      },
+      "id": "28a7b6e4-acc2-4a21-86a3-f73b5e364970",
+      "name": "RSS - TechCrunch AI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.marktechpost.com/feed/",
+        "options": {}
+      },
+      "id": "668c2cf7-29c7-4197-be97-4abb29623c31",
+      "name": "RSS - MarkTechPost",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://huggingface.co/blog/feed.xml",
+        "options": {}
+      },
+      "id": "3e15d360-379a-4d8e-81b3-d65896aaf600",
+      "name": "RSS - Hugging Face Blog",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "id": "af9c7436-2e6c-40ef-a2d9-07a0061ec05d",
+      "name": "Merge RSS Feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -16,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "some_robot_content"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "New"
+            },
+            {
+              "keyName": "source",
+              "keyValue": "slack"
+            }
+          ]
+        }
+      },
+      "id": "84bdac73-87fd-4a52-9c2f-e254395a23b6",
+      "name": "Get New Slack Ideas",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        1136
+      ],
+      "notes": "Pulls rows dropped in by the /input_idea slash command since the last run."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "some_robot_content"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "neq",
+              "keyValue": "New"
+            }
+          ]
+        }
+      },
+      "id": "3b8139c8-5d48-49e9-863b-773bc3d2c1e4",
+      "name": "Get Topic Memory",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        1328
+      ],
+      "notes": "Returns every existing row so we can pull the 'topic' column as the used-topics list for dedup. No filter = topic memory covers all statuses, not just Published."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a single prompt-ready item combining:\n//  - RSS candidates (from 'Cap to 15 Items')\n//  - Slack-submitted candidates (from 'Get New Slack Ideas')\n//  - existing topics for dedup (from 'Get Topic Memory')\n\nconst rssItems = $items('Cap to 7 Items').map(i => ({\n  source_type: 'rss',\n  title: i.json.title,\n  link: i.json.link,\n  contentSnippet: (i.json.contentSnippet || '').slice(0, 300)\n}));\n\nconst slackItems = $items('Get New Slack Ideas').map(i => ({\n  source_type: 'slack',\n  row_id: i.json.id,\n  topic: i.json.topic\n}));\n\nconst candidates = [...rssItems, ...slackItems].map((c, index) => ({ ...c, index }));\n\nconst existingTopics = $items('Get Topic Memory').map(i => i.json.topic).filter(Boolean);\n\nreturn [{\n  json: {\n    candidates,\n    existing_topics: existingTopics\n  }\n}];"
+      },
+      "id": "6ec735dc-ae69-440f-b638-7af8fb34670e",
+      "name": "Build Prompt Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const candidates = $json.output?.[0]?.content?.[0]?.text?.candidates;\n\nif (!Array.isArray(candidates)) {\n  throw new Error(\"No candidates array found in the LLM response.\");\n}\n\nconst originalCandidates = $('Build Prompt Data').item.json.candidates;\n\nreturn candidates.map(candidate => {\n  const original = (typeof candidate.index === 'number') ? originalCandidates[candidate.index] : null;\n  const source_url = (original && original.source_type === 'rss') ? original.link : null;\n  return { json: { ...candidate, source_url } };\n});"
+      },
+      "id": "7bbe4097-ac38-4130-9dd3-f178dc5e40a8",
+      "name": "Parse LLM Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        1104
+      ],
+      "notes": "One n8n item per candidate, each with source_type/row_id/topic/rationale/keep."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.source_type }}",
+                    "rightValue": "slack",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0d9e60ab-5955-42b3-931d-b1d0ef63f3b0"
+                  },
+                  {
+                    "leftValue": "={{ $json.keep }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "id": "bec74103-b2d3-4407-9572-7bd06377f411"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "slack-true"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.source_type }}",
+                    "rightValue": "slack",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f61fc9f2-f439-425b-b87c-f68e9a1c1829"
+                  },
+                  {
+                    "leftValue": "={{ $json.keep }}",
+                    "rightValue": false,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "id": "af548afe-ee3a-4e88-98bd-a7ac6218cb6a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "slack-false"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.source_type }}",
+                    "rightValue": "rss",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "fb84bb3c-8326-42ea-9a0d-f2f5eb49afa1"
+                  },
+                  {
+                    "leftValue": "={{ $json.keep }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "id": "add7c18b-3dc2-4d4e-89ba-123c17f19978"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RSS-true"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "260cee5c-0d90-409a-b4d9-32052b1aaa4f",
+      "name": "Route by Source + Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1680,
+        1072
+      ],
+      "notes": "4th output (fallback) catches rejected RSS candidates - those are simply dropped, nothing to update."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "some_robot_content"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "target_linkedin": false,
+            "target_x": false,
+            "approved_linkedin": false,
+            "approved_x": false,
+            "published_linkedin": false,
+            "published_x": false,
+            "topic_rationale": "={{ $json.rationale }}",
+            "topic": "={{ $json.topic }}",
+            "status": "Shortlisted",
+            "source": "slack"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d8ec31ab-75fb-4c7c-80d1-25f459c001cf",
+      "name": "Mark Slack Idea Shortlisted",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2112,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "some_robot_content"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "target_linkedin": false,
+            "target_x": false,
+            "approved_linkedin": false,
+            "approved_x": false,
+            "published_linkedin": false,
+            "published_x": false,
+            "topic_rationale": "={{ $json.rationale }}",
+            "topic": "={{ $json.topic }}",
+            "source": "slack",
+            "status": "Rejected"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "topic_rationale",
+              "displayName": "topic_rationale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "core_content",
+              "displayName": "core_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_brief",
+              "displayName": "image_brief",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_linkedin",
+              "displayName": "target_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_x",
+              "displayName": "target_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_linkedin",
+              "displayName": "content_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_x",
+              "displayName": "content_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_linkedin",
+              "displayName": "approved_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approved_x",
+              "displayName": "approved_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scheduled_date",
+              "displayName": "scheduled_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_linkedin",
+              "displayName": "published_linkedin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "published_x",
+              "displayName": "published_x",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "publish_error",
+              "displayName": "publish_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b9d06744-2881-4d4d-ad76-407559f7276d",
+      "name": "Mark Slack Idea Rejected",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2112,
+        1008
+      ],
+      "notes": "Rejected = skip this cycle, prevents the same idea being re-shown every week. 'Rejected' is a new status value - add it alongside the existing ones."
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "some_robot_content"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "target_linkedin": false,
+            "target_x": false,
+            "approved_linkedin": false,
+            "approved_x": false,
+            "published_linkedin": false,
+            "published_x": false,
+            "topic": "={{ $json.topic }}",
+            "topic_rationale": "={{ $json.rationale }}",
+            "source": "rss",
+            "status": "Shortlisted",
+            "source_url": "={{ $json.source_url }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "topic",
+              "id": "topic",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "topic_rationale",
+              "id": "topic_rationale",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source",
+              "id": "source",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "core_content",
+              "id": "core_content",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "image_brief",
+              "id": "image_brief",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target_linkedin",
+              "id": "target_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target_x",
+              "id": "target_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content_linkedin",
+              "id": "content_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content_x",
+              "id": "content_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "approved_linkedin",
+              "id": "approved_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "approved_x",
+              "id": "approved_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "scheduled_date",
+              "id": "scheduled_date",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "dateTime"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "published_linkedin",
+              "id": "published_linkedin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "published_x",
+              "id": "published_x",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "publish_error",
+              "id": "publish_error",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "source_url",
+              "id": "source_url",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "41880aae-56ad-4a3e-9243-4715c5f2c3af",
+      "name": "Insert Shortlisted RSS Idea",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2112,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        656,
+        1088
+      ],
+      "id": "8f55171d-35b5-407f-a203-5816ac1a4cd3",
+      "name": "Sync Sources Before Prompt"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "cachedResultName": "GPT-5.5",
+          "mode": "list",
+          "value": "gpt-5.5"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=EXISTING TOPICS (do not repeat these or anything too similar):\n\n{{ JSON.stringify($json.existing_topics) }}\n\nCANDIDATES:\n\n{{ JSON.stringify($json.candidates) }}\n\nEvaluate every candidate and return this JSON object:\n\n{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"source_type\": \"rss\" | \"slack\",\n      \"row_id\": null or string,\n      \"topic\": \"short punchy topic\",\n      \"rationale\": \"one sentence explaining why this topic is worth posting\",\n      \"keep\": true\n    }\n  ]\n}"
+            },
+            {
+              "role": "system",
+              "content": "You are an expert content strategist for an AI startup and AI solutions company.\n\nYour task is to evaluate candidate social media content ideas.\n\nRules:\n\n- Detect duplicate or very similar topics compared to the existing topics.\n- Reject topics that are too generic, repetitive or not interesting.\n- Prefer topics that are timely, educational, practical or thought-provoking.\n- Create concise, punchy topic titles.\n- Write a single sentence explaining why each topic is worth posting.\n- Never invent or modify row_id values.\n- Preserve the source_type exactly as provided.\n- If source_type is \"slack\", preserve the supplied row_id.\n- If source_type is \"rss\", set row_id to null.\n- Every candidate you were given includes an \"index\" field. Copy that index value back exactly unchanged for every candidate in your response - never invent, renumber, or omit it.\n- Be conservative when deciding keep=true. Only keep genuinely fresh and valuable topics.\n\nReturn a valid JSON object only."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 1500,
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1104,
+        1104
+      ],
+      "id": "f741b83a-a481-4c1c-b071-6e274d01c049",
+      "name": "Shortlist",
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "<your openAiApi>"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2112,
+        1440
+      ],
+      "id": "afa60be3-06c1-4ac2-b34b-57b312dfd312",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "content": "Sources suggested by the team\n\nhttps://aiweekly.co/ - ADDED\n\nhttps://www.bbc.com/news/topics/  - ADDED\n\n\nTHESE DONT HAVE RSS FEED\nhttps://edition.cnn.com/business/tech/ai-news-artificial-intelligence-updates\nhttps://www.therundown.ai/\nhttps://mrkt30.com/ \nhttps://aimagazine.com/news",
+        "height": 400,
+        "width": 592
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        256
+      ],
+      "id": "d5dfe3a1-8f35-4d89-9a32-f29622f46590",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "SoMe Robot - 01j Refresh Status Board"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "52eab667-5b52-40ff-9f1e-be9da483f6a5",
+      "name": "Refresh Status Board",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2560,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "SoMe Robot - 01c Canvas Publish"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "d62bfb84-3163-47c8-a073-593e2e873f46",
+      "name": "Trigger Canvas Publish",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2560,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://aiweekly.co/issues.rss",
+        "options": {}
+      },
+      "id": "65e558a8-613b-4cb5-879e-b3e0ad5fbe47",
+      "name": "RSS - AI Weekly",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/topics/ce1qrvleleqt/rss.xml",
+        "options": {}
+      },
+      "id": "baf26b75-00cd-40a0-bdee-95b61516a694",
+      "name": "RSS - BBC AI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 7
+      },
+      "id": "b8934b32-3fd5-4045-9e4f-715fc0fc121c",
+      "name": "Cap to 7 Items",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        208,
+        432
+      ],
+      "notes": "Keeps the LLM prompt small and cheap. Adjust as needed."
+    }
+  ],
+  "connections": {
+    "Weekly Trigger (Mon 8am)": {
+      "main": [
+        [
+          {
+            "node": "RSS - TechCrunch AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - MarkTechPost",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - Hugging Face Blog",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get New Slack Ideas",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Topic Memory",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - AI Weekly",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - BBC AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - TechCrunch AI": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - MarkTechPost": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS Feeds",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS - Hugging Face Blog": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS Feeds",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge RSS Feeds": {
+      "main": [
+        [
+          {
+            "node": "Cap to 7 Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Slack Ideas": {
+      "main": [
+        [
+          {
+            "node": "Sync Sources Before Prompt",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Topic Memory": {
+      "main": [
+        [
+          {
+            "node": "Sync Sources Before Prompt",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Build Prompt Data": {
+      "main": [
+        [
+          {
+            "node": "Shortlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM Output": {
+      "main": [
+        [
+          {
+            "node": "Route by Source + Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Source + Decision": {
+      "main": [
+        [
+          {
+            "node": "Mark Slack Idea Shortlisted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Slack Idea Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Shortlisted RSS Idea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Sources Before Prompt": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shortlist": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Slack Idea Shortlisted": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trigger Canvas Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Slack Idea Rejected": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Shortlisted RSS Idea": {
+      "main": [
+        [
+          {
+            "node": "Refresh Status Board",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trigger Canvas Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - AI Weekly": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS Feeds",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "RSS - BBC AI": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS Feeds",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Cap to 7 Items": {
+      "main": [
+        [
+          {
+            "node": "Sync Sources Before Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

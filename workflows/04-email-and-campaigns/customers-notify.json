@@ -1,0 +1,1173 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "Customers_Notify",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.daysFromCreation }}",
+                    "rightValue": 1,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "id": "599bc58e-89b6-4237-8d30-fa20fbad1cce"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1 day welcome"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b4ad07c8-9970-4fbc-9e55-a6258b1372bb",
+                    "leftValue": "={{ $json.daysFromCreation === 7 && $json.isSubscribed === false }}",
+                    "rightValue": 30,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1 week free plan"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "26caf0ca-9efe-4b51-a9ad-d6ad5a097243",
+                    "leftValue": "={{ $json.daysFromCreation === 14 && $json.isSubscribed === false }}",
+                    "rightValue": 7,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "2 weeks free plan"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9362a770-4082-44fc-8e0f-489ab04d213f",
+                    "leftValue": "={{ $json.daysFromCreation === 30 && $json.isSubscribed === false }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1 month free plan"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        496
+      ],
+      "id": "4334ec73-9cf5-4fe0-ae0c-7f6dd451a902",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "url": "={{PLATFORM_API_BASE_URL}}/customers/list",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "<REDACTED>"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1440,
+        112
+      ],
+      "id": "ec6ebe8b-1f54-40ed-bf68-291cf27b4483",
+      "name": "Get all customers"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst days = Number(j.daysFromCreation);\n\n// Send only on day 1\nif (days !== 1) {\n  return {\n    json: {\n      ...j,\n      skipEmail: true\n    }\n  };\n}\n\n// ---- Public assets / links ----\nconst HERO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/email_picture_for+Automation/Welcome.PNG\";\nconst LOGO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/ss.png\";\nconst _linkResult = $('Build Link (Welcome)').first().json;\nif (!_linkResult.success) {\n  throw new Error('UTM Link Builder failed: ' + _linkResult.error);\n}\nconst CTA_URL = _linkResult.url;\nconst LINKEDIN_URL = \"https://www.linkedin.com/company/solvestack-ai/\";\nconst X_URL = \"https://x.com/solvestackai\";\nconst SUPPORT_EMAIL = \"user@example.com\";\n\nconst custName = escapeHtml(j.customerName ?? \"there\");\n\nconst customerNameRaw = j.customerName ?? \"there\";\nconst customerName = escapeHtml(customerNameRaw);\nconst subject = `Welcome to SolveStack.ai, ${customerName}!`;\n\nconst body = `<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\" />\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />\n  <meta name=\"x-apple-disable-message-reformatting\" />\n  <meta name=\"format-detection\" content=\"telephone=no,address=no,email=no,date=no,url=no\" />\n  <title>Welcome to SolveStack</title>\n</head>\n\n<body style=\"margin:0;padding:0;background:#f3f4f6;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"background:#f3f4f6;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n\n        <table role=\"presentation\" width=\"640\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n               style=\"width:640px;max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;\">\n\n          <!-- Top bar -->\n          <tr>\n            <td style=\"height:4px;background:#2563eb;line-height:4px;font-size:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- Header with logo -->\n          <tr>\n            <td align=\"center\" style=\"background:#e5e7eb;padding:16px 0;\">\n              <img\n                src=\"${LOGO_IMG}\"\n                width=\"170\"\n                alt=\"SolveStack\"\n                style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n              />\n            </td>\n          </tr>\n\n          <!-- Hero -->\n          <tr>\n            <td>\n              <img\n                src=\"${HERO_IMG}\"\n                width=\"640\"\n                alt=\"Welcome to SolveStack\"\n                style=\"display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;\"\n              />\n            </td>\n          </tr>\n\n          <!-- Body -->\n          <tr>\n            <td style=\"padding:22px 28px 20px 28px;color:#0f172a;font-family:Arial,Helvetica,sans-serif;\">\n\n              <p style=\"margin:0 0 14px 0;font-size:14px;line-height:20px;color:#111827;\">\n                Hi ${customerName},\n              </p>\n\n              <p style=\"margin:0 0 14px 0;font-size:14px;line-height:20px;color:#374151;\">\n                Welcome to SolveStack.ai and thank you for joining us.\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                SolveStack helps organizations explore AI opportunities more clearly by matching business needs with relevant AI use cases already available on the platform.\n              </p>\n\n              <p style=\"margin:0 0 10px 0;font-size:18px;line-height:24px;font-weight:700;color:#111827;\">\n                How to get value from the platform\n              </p>\n\n              <p style=\"margin:0 0 10px 0;font-size:14px;line-height:20px;color:#374151;\">\n                A good first step is to describe your business goals and the main challenges you are trying to solve. The clearer your input, the better the platform can support your discovery process.\n              </p>\n\n              <p style=\"margin:0 0 10px 0;font-size:14px;line-height:20px;color:#374151;\">\n                Once you enter your goals and challenges, SolveStack.ai algorithm will suggest solutions. It will match you with the AI Use Cases available in the platform. This helps you quickly identify relevant solutions and see where AI may create practical business value. If you didn't find what you are looking for, we are happy to assist you personally\"\n              </p>\n\n              <p style=\"margin:0 0 10px 0;font-size:15px;font-weight:700;color:#2563eb;\">\n                Suggested first actions\n              </p>\n\n              <p style=\"margin:0 0 16px 0;font-size:14px;line-height:20px;color:#374151;\">\n                1. Log in to your account<br>\n                2. Add your business goals<br>\n                3. Add your operational or strategic challenges<br>\n                4. Run a match against existing AI use cases<br>\n                5. Review the most relevant results and continue refining your needs\n              </p>\n\n              <p style=\"margin:0 0 10px 0;font-size:15px;font-weight:700;color:#2563eb;\">\n                Need help getting started?\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                You can access the platform here:\n                <a href=\"${CTA_URL}\" style=\"color:#2563eb;text-decoration:underline;\">SolveStack.ai</a>.\n                If you need any help with onboarding or defining your goals and challenges, simply reply to this email and our team will be happy to assist.\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:15px;line-height:22px;font-weight:700;color:#111827;\">\n                You can also follow us on social media for updates, new initiatives, and insights from our AI community.\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background:#ffffff;padding:0px 28px 22px 28px;font-family:Arial,Helvetica,sans-serif;border-top:1px solid #e5e7eb;\">\n\n              <!-- Kind wishes -->\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#111827;font-style:italic;\">\n                Kind wishes!\n              </p>\n\n              <!-- Logo -->\n              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n                <tr>\n                  <td valign=\"middle\" style=\"padding-bottom:14px;\">\n                    <img\n                      src=\"${LOGO_IMG}\"\n                      width=\"240\"\n                      alt=\"SolveStack.ai\"\n                      style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n                    />\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Contact Info -->\n              <p style=\"margin:0 0 10px 0;font-size:15px;line-height:22px;color:#111827;font-weight:700;\">\n                <Sender Name> |\n                <span style=\"font-weight:400;\">AI Assistant</span>\n              </p>\n\n              <p style=\"margin:0 0 6px 0;font-size:14px;line-height:22px;color:#111827;\">\n                Let's Stay in Touch |\n                <a href=\"mailto:user@example.com\"\n                   style=\"color:#2563eb;text-decoration:underline;\">\n                  user@example.com\n                </a>\n              </p>\n\n              <p style=\"margin:0;font-size:14px;line-height:22px;color:#111827;\">\n                Visit Us |\n                <a href=\"${CTA_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  SolveStack.ai\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${LINKEDIN_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  LinkedIn\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${X_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  X\n                </a>\n              </p>\n\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"height:10px;background:#ffffff;line-height:10px;font-size:0;\">&nbsp;</td>\n          </tr>\n   \n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    to: j.email,\n    subject,\n    body,\n    isHtml: true\n  }\n};\n\nfunction escapeHtml(s) {\n  return String(s ?? \"\")\n    .replaceAll(\"&\", \"&amp;\")\n    .replaceAll(\"<\", \"&lt;\")\n    .replaceAll(\">\", \"&gt;\")\n    .replaceAll('\"', \"&quot;\")\n    .replaceAll(\"'\", \"&#39;\");\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        320
+      ],
+      "id": "85a7c602-983b-4d56-959e-eb9d94e3af03",
+      "name": "Prepare_Email (Welcome)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4eda0291-9d31-4b21-9c55-eca2ecaadcba",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "27bd15ef-256d-46dc-b76b-aac5c0859c9f",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "3691f312-49aa-4ae2-8319-151e621c2c96",
+              "name": "createdAt",
+              "value": "={{ $json.createdAt }}",
+              "type": "string"
+            },
+            {
+              "id": "7e6b7676-df3a-4e90-9c9d-c997a8eb6a43",
+              "name": "isActive",
+              "value": "={{ $json.isActive }}",
+              "type": "boolean"
+            },
+            {
+              "id": "adffd56f-f23f-4e95-901e-bc7163359ab4",
+              "name": "isSubscribed",
+              "value": "={{ $json.isSubscribed === true || $json.isSubscribed === 'true' || $json.isSubscribed === 1 || $json.isSubscribed === '1' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "196a7912-7a6a-4431-9d0b-094ec5fbd46f",
+              "name": "companyName",
+              "value": "={{ $json.firstName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1216,
+        112
+      ],
+      "id": "1f603e61-19cb-41ce-be81-aa41ebc48d77",
+      "name": "Set creation date"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\nfunction toDateOnly(value) {\n  if (!value) return null;\n\n  const d = new Date(value);\n  if (isNaN(d.getTime())) return null;\n\n  return new Date(Date.UTC(\n    d.getUTCFullYear(),\n    d.getUTCMonth(),\n    d.getUTCDate()\n  ));\n}\n\nfunction toBool(v, d = false) {\n  if (typeof v === \"boolean\") return v;\n  if (typeof v === \"number\") return v !== 0;\n\n  if (typeof v === \"string\") {\n    const s = v.trim().toLowerCase();\n\n    if ([\"true\", \"1\", \"yes\", \"y\"].includes(s)) return true;\n    if ([\"false\", \"0\", \"no\", \"n\", \"\"].includes(s)) return false;\n  }\n\n  if (v === null || v === undefined) return d;\n\n  return d;\n}\n\nconst today = new Date();\nconst todayDateOnly = new Date(Date.UTC(\n  today.getUTCFullYear(),\n  today.getUTCMonth(),\n  today.getUTCDate()\n));\n\nconst MS_PER_DAY = 24 * 60 * 60 * 1000;\n\nreturn rows.map(r => {\n  const createdDateOnly = toDateOnly(r.createdAt);\n\n  let daysFromCreation = null;\n  if (createdDateOnly) {\n    daysFromCreation = Math.floor((todayDateOnly - createdDateOnly) / MS_PER_DAY);\n  }\n\n  return {\n    json: {\n      customerId: r.id ?? null,\n      customerName: r.companyName ?? \"\",\n      email: r.email ?? null,\n      website: r.website ?? null,\n      location: r.location ?? null,\n      creationDate: r.createdAt ?? null,\n      isActive: r.isActive ?? null,\n      isSubscribed: toBool(r.isSubscribed, false),\n      daysFromCreation: daysFromCreation\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        112
+      ],
+      "id": "134fb461-c94e-45ed-ac34-ed2556041d05",
+      "name": "Calculate daysFromcreation and plan"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst days = Number(j.daysFromCreation);\nconst isSubscribed = j.isSubscribed === true;\n\n// Send only on day 14 for free-plan customers\nif (days !== 14 || isSubscribed) {\n  return {\n    json: {\n      ...j,\n      skipEmail: true\n    }\n  };\n}\n\n// ---- Public assets / links ----\nconst HERO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/email_picture_for+Automation/30days.PNG\";\nconst LOGO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/ss.png\";\nconst _linkResult = $('Build Link (2 weeks)').first().json;\nif (!_linkResult.success) {\n  throw new Error('UTM Link Builder failed: ' + _linkResult.error);\n}\nconst CTA_URL = _linkResult.url;\nconst LINKEDIN_URL = \"https://www.linkedin.com/company/solvestack-ai/\";\nconst X_URL = \"https://x.com/solvestackai\";\n\n\n\nconst custName = escapeHtml(j.customerName ?? \"there\");\nconst subject = `Unlock more AI use cases with SolveStack.ai Pro`;\n\nconst body = `<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\" />\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />\n  <meta name=\"x-apple-disable-message-reformatting\" />\n  <meta name=\"format-detection\" content=\"telephone=no,address=no,email=no,date=no,url=no\" />\n  <title>SolveStack Pro</title>\n</head>\n\n<body style=\"margin:0;padding:0;background:#f3f4f6;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"background:#f3f4f6;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n\n        <table role=\"presentation\" width=\"640\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n               style=\"width:640px;max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;\">\n\n          <tr>\n            <td style=\"height:4px;background:#2563eb;line-height:4px;font-size:0;\">&nbsp;</td>\n          </tr>\n\n          <tr>\n            <td align=\"center\" style=\"background:#e5e7eb;padding:16px 0;\">\n              <img\n                src=\"${LOGO_IMG}\"\n                width=\"170\"\n                alt=\"SolveStack\"\n                style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n              />\n            </td>\n          </tr>\n\n          <tr>\n            <td>\n              <img\n                src=\"${HERO_IMG}\"\n                width=\"640\"\n                alt=\"SolveStack.ai\"\n                style=\"display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;\"\n              />\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"padding:26px 28px 20px 28px;color:#0f172a;font-family:Arial,Helvetica,sans-serif;\">\n\n              <p style=\"margin:0 0 14px 0;font-size:14px;line-height:20px;color:#111827;\">\n                Hi ${custName},\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                It's been about two weeks since you joined SolveStack.ai — we hope you've started discovering AI use cases that fit your workflow.\n              </p>\n\n              <p style=\"margin:0 0 22px 0;font-size:18px;line-height:26px;font-weight:700;color:#111827;\">\n                If you're looking to go deeper, our Pro Plan is designed to give you full access and more flexibility.\n              </p>\n\n              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"border-collapse:collapse;\">\n                <tr>\n                  <td valign=\"top\" style=\"width:52%;padding-right:12px;\">\n\n                    <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                      Pro is built for users who want to actively explore, compare, and stay ahead in the AI landscape. If you're ready to unlock the full experience, you can upgrade anytime from your dashboard.\n                    </p>\n\n                    <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"margin:0 0 18px 0;\">\n                      <tr>\n                        <td align=\"center\" style=\"border-radius:28px;background:#2f5ae6;\">\n                          <a href=\"${CTA_URL}\"\n                             style=\"display:inline-block;padding:14px 26px;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:28px;\">\n                            Upgrade to Pro\n                          </a>\n                        </td>\n                      </tr>\n                    </table>\n\n                    <p style=\"margin:0 0 12px 0;font-size:14px;line-height:20px;color:#374151;\">\n                      As always, if you have questions or want help finding the right use cases, just reply to this email — we're happy to help.\n                    </p>\n\n                   <p style=\"margin:0;font-size:13px;line-height:18px;color:#111827;\">\n                  Warm regards,<br>\n                                </p>\n\n                  </td>\n\n                  <td valign=\"top\" style=\"width:48%;padding-left:12px;\">\n\n                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n                           style=\"background:#2f5ae6;border-radius:16px;color:#ffffff;box-shadow:0 8px 18px rgba(0,0,0,0.12);\">\n                      <tr>\n                        <td style=\"padding:18px 18px 10px 18px;text-align:center;font-size:16px;line-height:20px;font-weight:700;\">\n                          Pro\n                        </td>\n                      </tr>\n\n                      <tr>\n                        <td style=\"padding:0 18px 4px 18px;text-align:center;font-size:34px;line-height:38px;font-weight:800;\">\n                          €19 <span style=\"font-size:16px;font-weight:700;\">/ month</span>\n                        </td>\n                      </tr>\n\n                      <tr>\n                        <td style=\"padding:0 18px 12px 18px;text-align:center;font-size:11px;line-height:16px;opacity:0.95;\">\n                          180 EUR/year (2 months free)\n                        </td>\n                      </tr>\n\n                      <tr>\n                        <td style=\"padding:0 18px 14px 18px;text-align:center;font-size:11px;line-height:16px;font-weight:700;opacity:0.95;\">\n                          Designed for AI-based solution implementers\n                        </td>\n                      </tr>\n\n                      <tr>\n                        <td style=\"padding:14px 18px 18px 18px;border-top:1px solid rgba(255,255,255,0.18);font-size:12px;line-height:20px;\">\n                          ✓ Full access to all AI use cases<br>\n                          ✓ 50 free credits for search & match with preferred use cases and startups<br>\n                          ✓ Bookmark selected use cases<br>\n                          ✓ Early access to new listings<br>\n                          ✓ Email newsletter with AI industry updates\n                        </td>\n                      </tr>\n                    </table>\n\n                  </td>\n                </tr>\n              </table>\n\n            </td>\n          </tr>\n\n\n          <!-- Footer -->\n          <tr>\n           <td style=\"background:#ffffff;padding:0px 28px 22px 28px;font-family:Arial,Helvetica,sans-serif;\">\n\n             <!-- Logo -->\n              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n                <tr>\n                  <td valign=\"middle\" style=\"padding-bottom:14px;\">\n                    <img\n                      src=\"${LOGO_IMG}\"\n                      width=\"240\"\n                      alt=\"SolveStack.ai\"\n                      style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n                    />\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Contact Info -->\n              <p style=\"margin:0 0 10px 0;font-size:15px;line-height:22px;color:#111827;font-weight:700;\">\n                <Sender Name> |\n                <span style=\"font-weight:400;\">AI Assistant</span>\n              </p>\n\n              <p style=\"margin:0 0 6px 0;font-size:14px;line-height:22px;color:#111827;\">\n                Let's Stay in Touch |\n                <a href=\"mailto:user@example.com\"\n                   style=\"color:#2563eb;text-decoration:underline;\">\n                  user@example.com\n                </a>\n              </p>\n\n              <p style=\"margin:0;font-size:14px;line-height:22px;color:#111827;\">\n                Visit Us |\n                <a href=\"${CTA_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  SolveStack.ai\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${LINKEDIN_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  LinkedIn\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${X_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  X\n                </a>\n              </p>\n\n                       </td>\n          </tr>\n          </tr>\n\n          <tr>\n            <td style=\"height:10px;background:#ffffff;line-height:10px;font-size:0;\">&nbsp;</td>\n          </tr>\n          \n    </table>\n          \n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    to: j.email,\n    subject,\n    body,\n    isHtml: true\n  }\n};\n\nfunction escapeHtml(s) {\n  return String(s ?? \"\")\n    .replaceAll(\"&\", \"&amp;\")\n    .replaceAll(\"<\", \"&lt;\")\n    .replaceAll(\">\", \"&gt;\")\n    .replaceAll('\"', \"&quot;\")\n    .replaceAll(\"'\", \"&#39;\");\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        784
+      ],
+      "id": "ae09e56e-375b-466f-a4d6-3885757bfc47",
+      "name": "Prepare_Email (2 weeks)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst days = Number(j.daysFromCreation);\nconst isSubscribed = j.isSubscribed === true;\n\n// Send only on day 30 for free-plan customers\nif (days !== 30 || isSubscribed) {\n  return {\n    json: {\n      ...j,\n      skipEmail: true\n    }\n  };\n}\n\n// ---- Public assets / links ----\nconst HERO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/email_picture_for+Automation/60+days.PNG\";\nconst LOGO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/ss.png\";\nconst _linkResult = $('Build Link (1 month)').first().json;\nif (!_linkResult.success) {\n  throw new Error('UTM Link Builder failed: ' + _linkResult.error);\n}\nconst CTA_URL = _linkResult.url;\nconst LINKEDIN_URL = \"https://www.linkedin.com/company/solvestack-ai/\";\nconst X_URL = \"https://x.com/solvestackai\";\nconst SUPPORT_EMAIL = \"user@example.com\";\n\nconst customerNameRaw = j.customerName ?? \"there\";\nconst customerName = escapeHtml(customerNameRaw);\nconst subject = `One month with SolveStack.ai — have you not found the right AI solution yet?`;\n\nconst body = `<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\" />\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />\n  <meta name=\"x-apple-disable-message-reformatting\" />\n  <meta name=\"format-detection\" content=\"telephone=no,address=no,email=no,date=no,url=no\" />\n  <title>One month with SolveStack.ai</title>\n</head>\n\n<body style=\"margin:0;padding:0;background:#f3f4f6;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"background:#f3f4f6;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n\n        <table role=\"presentation\" width=\"640\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n               style=\"width:640px;max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;\">\n\n          <tr>\n            <td style=\"height:4px;background:#2563eb;line-height:4px;font-size:0;\">&nbsp;</td>\n          </tr>\n\n          <tr>\n            <td align=\"center\" style=\"background:#e5e7eb;padding:16px 0;\">\n              <img\n                src=\"${LOGO_IMG}\"\n                width=\"170\"\n                alt=\"SolveStack\"\n                style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n              />\n            </td>\n          </tr>\n\n          <tr>\n            <td>\n              <img\n                src=\"${HERO_IMG}\"\n                width=\"640\"\n                alt=\"SolveStack.ai\"\n                style=\"display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;\"\n              />\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"padding:22px 28px 20px 28px;color:#0f172a;font-family:Arial,Helvetica,sans-serif;\">\n\n              <p style=\"margin:0 0 14px 0;font-size:14px;line-height:20px;color:#111827;\">\n                Hi ${customerName},\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                It's been one month since you joined SolveStack.ai ✍️\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                Most users discover their “aha” moment within the first few weeks: finding the AI use cases that truly save time or unlock new capabilities.\n              </p>\n\n              <p style=\"margin:0 0 6px 0;font-size:20px;line-height:26px;font-weight:700;color:#111827;\">\n                We’re curious:\n              </p>\n\n              <p style=\"margin:0 0 6px 0;font-size:32px;line-height:38px;font-weight:800;color:#111827;letter-spacing:0.2px;\">\n                Have you found yours yet?\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:18px;line-height:24px;font-weight:700;color:#111827;\">\n                If not, we’d love to help.\n              </p>\n\n              <p style=\"margin:0 0 8px 0;font-size:14px;line-height:20px;color:#374151;\">\n                Tell us:\n              </p>\n\n              <ul style=\"margin:0 0 18px 18px;padding:0;font-size:14px;line-height:20px;color:#374151;\">\n                <li>What kind of work you're trying to amplify with AI</li>\n                <li>What industry or role you're working in</li>\n                <li>What's frustrating you in your company's daily work</li>\n              </ul>\n\n              <p style=\"margin:0 0 20px 0;font-size:18px;line-height:26px;font-weight:700;color:#111827;\">\n                We can suggest tailored AI Use Cases — or even prioritize building new ones that fit your needs. Just reply to this email. We’re listening.\n              </p>\n\n              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"margin:0 0 22px 0;\">\n                <tr>\n                  <td align=\"center\" style=\"border-radius:28px;background:#2f5ae6;\">\n                    <a href=\"${CTA_URL}\"\n                       style=\"display:inline-block;padding:16px 28px;font-size:18px;line-height:22px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:28px;\">\n                      Click to discover Pro Plan!\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <p style=\"margin:0;font-size:14px;line-height:20px;color:#374151;\">\n                Thanks for building with us.\n              </p> \n              </td>\n          </tr>  \n          <!-- Footer -->\n          <tr>\n            <td style=\"background:#ffffff;padding:0px 28px 22px 28px;font-family:Arial,Helvetica,sans-serif;\">\n\n              <!-- Kind wishes -->\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#111827;font-style:italic;\">\n                Kind wishes!\n              </p>\n\n              <!-- Logo -->\n              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n                <tr>\n                  <td valign=\"middle\" style=\"padding-bottom:14px;\">\n                    <img\n                      src=\"${LOGO_IMG}\"\n                      width=\"240\"\n                      alt=\"SolveStack.ai\"\n                      style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n                    />\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Contact Info -->\n              <p style=\"margin:0 0 10px 0;font-size:15px;line-height:22px;color:#111827;font-weight:700;\">\n                <Sender Name> |\n                <span style=\"font-weight:400;\">AI Assistant</span>\n              </p>\n\n              <p style=\"margin:0 0 6px 0;font-size:14px;line-height:22px;color:#111827;\">\n                Let's Stay in Touch |\n                <a href=\"mailto:user@example.com\"\n                   style=\"color:#2563eb;text-decoration:underline;\">\n                  user@example.com\n                </a>\n              </p>\n\n              <p style=\"margin:0;font-size:14px;line-height:22px;color:#111827;\">\n                Visit Us |\n                <a href=\"${CTA_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  SolveStack.ai\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${LINKEDIN_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  LinkedIn\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${X_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  X\n                </a>\n              </p>\n\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"height:10px;background:#ffffff;line-height:10px;font-size:0;\">&nbsp;</td>\n          </tr>\n       \n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    to: j.email,\n    subject,\n    body,\n    isHtml: true\n  }\n};\n\nfunction escapeHtml(s) {\n  return String(s ?? \"\")\n    .replaceAll(\"&\", \"&amp;\")\n    .replaceAll(\"<\", \"&lt;\")\n    .replaceAll(\">\", \"&gt;\")\n    .replaceAll('\"', \"&quot;\")\n    .replaceAll(\"'\", \"&#39;\");\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        1328
+      ],
+      "id": "5f5ee52f-5771-42ee-bbbf-c948ccae4870",
+      "name": "Prepare_Email (1 month)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst days = Number(j.daysFromCreation);\nconst isSubscribed = j.isSubscribed === true;\n\n// Send only on day 7 for free-plan customers\nif (days !== 7 || isSubscribed) {\n  return {\n    json: {\n      ...j,\n      skipEmail: true\n    }\n  };\n}\n\n// ---- Public assets / links ----\nconst HERO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/email_picture_for+Automation/1+week.PNG\";\nconst LOGO_IMG = \"https://<your-bucket>.s3.<region>.amazonaws.com/ss.png\";\nconst _linkResult = $('Build Link (1 week)').first().json;\nif (!_linkResult.success) {\n  throw new Error('UTM Link Builder failed: ' + _linkResult.error);\n}\nconst CTA_URL = _linkResult.url;\nconst LINKEDIN_URL = \"https://www.linkedin.com/company/solvestack-ai/\";\nconst X_URL = \"https://x.com/solvestackai\";\nconst SUPPORT_EMAIL = \"user@example.com\";\n\nconst customerNameRaw = j.customerName ?? \"there\";\nconst customerName = escapeHtml(customerNameRaw);\nconst subject = `How has your first week with SolveStack.ai been?`;\n\nconst body = `<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\" />\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />\n  <meta name=\"x-apple-disable-message-reformatting\" />\n  <meta name=\"format-detection\" content=\"telephone=no,address=no,email=no,date=no,url=no\" />\n  <title>How has your first week with SolveStack.ai been?</title>\n</head>\n\n<body style=\"margin:0;padding:0;background:#f3f4f6;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"background:#f3f4f6;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n\n        <table role=\"presentation\" width=\"640\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n               style=\"width:640px;max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;\">\n\n          <tr>\n            <td style=\"height:4px;background:#2563eb;line-height:4px;font-size:0;\">&nbsp;</td>\n          </tr>\n\n          <tr>\n            <td align=\"center\" style=\"background:#e5e7eb;padding:16px 0;\">\n              <img\n                src=\"${LOGO_IMG}\"\n                width=\"170\"\n                alt=\"SolveStack\"\n                style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n              />\n            </td>\n          </tr>\n\n          <tr>\n            <td>\n              <img\n                src=\"${HERO_IMG}\"\n                width=\"640\"\n                alt=\"SolveStack.ai\"\n                style=\"display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;\"\n              />\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"padding:22px 28px 20px 28px;color:#0f172a;font-family:Arial,Helvetica,sans-serif;\">\n\n              <p style=\"margin:0 0 14px 0;font-size:14px;line-height:20px;color:#111827;\">\n                Hi ${customerName},\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                It's been about a week since you signed up for SolveStack.ai, and we wanted to check in with you.\n              </p>\n\n              <p style=\"margin:0 0 12px 0;font-size:20px;line-height:26px;font-weight:700;color:#111827;\">\n                We’d love to hear about your experience\n              </p>\n\n              <ul style=\"margin:0 0 18px 18px;padding:0;font-size:14px;line-height:20px;color:#374151;\">\n                <li>How was the onboarding process? Remember to complete your company profile for the most benefits!</li>\n                <li>What's working well?</li>\n                <li>Anything confusing or missing?</li>\n                <li>Did the platform meet your expectations?</li>\n              </ul>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                Your feedback helps us prioritize improvements and build features that genuinely support your work.\n              </p>\n\n\n            <!-- Contact CTA Button -->\n<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"margin:18px 0;\">\n  <tr>\n    <td align=\"center\">\n      <a href=\"${CTA_URL}\"\n         style=\"background:#2563eb;\n                color:#ffffff;\n                text-decoration:none;\n                font-weight:700;\n                font-size:14px;\n                padding:12px 22px;\n                border-radius:6px;\n                display:inline-block;\n                font-family:Arial,Helvetica,sans-serif;\">\n        Share Your Feedback\n      </a>\n    </td>\n  </tr>\n</table>\n\n\n              <p style=\"margin:0 0 12px 0;font-size:18px;line-height:24px;font-weight:700;color:#111827;\">\n                Have any AI Use Cases caught your eye?\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                As we continue to expand our database with AI use cases relevant to organizations like yours, feel free to tell us what you need.\n                If you have ideas, feedback, questions, or simply want to share your experience, just reply to this email or reach us anytime at\n                <a href=\"mailto:${SUPPORT_EMAIL}\" style=\"color:#2563eb;text-decoration:underline;\">${SUPPORT_EMAIL}</a>.\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:22px;line-height:28px;font-weight:800;color:#2563eb;\">\n                We read every message\n              </p>\n\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#374151;\">\n                Thanks again for being part of our community. We're glad you're here.\n              </p>  \n\n            </td>\n          </tr>\n\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background:#ffffff;padding:0px 28px 22px 28px;font-family:Arial,Helvetica,sans-serif;border-top:1px solid #e5e7eb;\">\n\n              <!-- Kind wishes -->\n              <p style=\"margin:0 0 18px 0;font-size:14px;line-height:20px;color:#111827;font-style:italic;\">\n                Kind wishes!\n              </p>\n\n              <!-- Logo -->\n              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n                <tr>\n                  <td valign=\"middle\" style=\"padding-bottom:14px;\">\n                    <img\n                      src=\"${LOGO_IMG}\"\n                      width=\"240\"\n                      alt=\"SolveStack.ai\"\n                      style=\"display:block;border:0;outline:none;text-decoration:none;height:auto;\"\n                    />\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Contact Info -->\n              <p style=\"margin:0 0 10px 0;font-size:15px;line-height:22px;color:#111827;font-weight:700;\">\n                <Sender Name>|\n                <span style=\"font-weight:400;\">AI Assistant</span>\n              </p>\n\n              <p style=\"margin:0 0 6px 0;font-size:14px;line-height:22px;color:#111827;\">\n                Let's Stay in Touch |\n                <a href=\"mailto:user@example.com\"\n                   style=\"color:#2563eb;text-decoration:underline;\">\n                  user@example.com\n                </a>\n              </p>\n\n              <p style=\"margin:0;font-size:14px;line-height:22px;color:#111827;\">\n                Visit Us |\n                <a href=\"${CTA_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  SolveStack.ai\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${LINKEDIN_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  LinkedIn\n                </a>\n                &nbsp;|&nbsp;\n                <a href=\"${X_URL}\" style=\"color:#2563eb;text-decoration:underline;\">\n                  X\n                </a>\n              </p>\n\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"height:10px;background:#ffffff;line-height:10px;font-size:0;\">&nbsp;</td>\n          </tr>\n       \n\n\n\n\n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nreturn {\n  json: {\n    to: j.email,\n    subject,\n    body,\n    isHtml: true\n  }\n};\n\nfunction escapeHtml(s) {\n  return String(s ?? \"\")\n    .replaceAll(\"&\", \"&amp;\")\n    .replaceAll(\"<\", \"&lt;\")\n    .replaceAll(\">\", \"&gt;\")\n    .replaceAll('\"', \"&quot;\")\n    .replaceAll(\"'\", \"&#39;\");\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        560
+      ],
+      "id": "ab3e28d1-2100-4afb-8fa2-b57b57761ecf",
+      "name": "Prepare_Email (1 week)"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "token"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2000,
+        -80
+      ],
+      "id": "c443030a-75a7-4b60-b44e-4fbbf77a6c82",
+      "name": "Initiated after login",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "content": "This flow sends notification to customers on specific occasions such as welcome email",
+        "height": 80,
+        "width": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        -144
+      ],
+      "id": "09d7e86e-479f-4507-9ffd-fb40e1925a5c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        304
+      ],
+      "id": "57302ecb-0afb-418c-a68d-094629eef652",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "content": "LONG FORMAT- NOT USED DAILY",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        -368
+      ],
+      "id": "b0da7852-552d-411b-87b9-37b373046456",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\n// ---------- helpers ----------\nconst esc = (v) =>\n  String(v ?? \"\")\n    .replaceAll(\"&\", \"&amp;\")\n    .replaceAll(\"<\", \"&lt;\")\n    .replaceAll(\">\", \"&gt;\")\n    .replaceAll('\"', \"&quot;\")\n    .replaceAll(\"'\", \"&#39;\");\n\nconst toInt = (v, d = 0) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : d;\n};\n\nconst sortByName = (a, b) => (a.name || \"\").localeCompare(b.name || \"\");\n\n// Flexible boolean parser\nfunction toBool(v, d = false) {\n  if (typeof v === \"boolean\") return v;\n  if (typeof v === \"number\") return v !== 0;\n  if (typeof v === \"string\") {\n    const s = v.trim().toLowerCase();\n    if ([\"true\", \"1\", \"yes\", \"y\"].includes(s)) return true;\n    if ([\"false\", \"0\", \"no\", \"n\"].includes(s)) return false;\n  }\n  return d;\n}\n\n// Check subscription / free-plan status from different possible fields\nfunction getIsSubscribed(r) {\n  // direct boolean fields\n  if (r.isSubscribed !== undefined) return toBool(r.isSubscribed);\n  if (r.subscribed !== undefined) return toBool(r.subscribed);\n  if (r.hasSubscription !== undefined) return toBool(r.hasSubscription);\n\n  // plan-based fields\n  const plan = String(r.plan ?? r.subscriptionPlan ?? r.planName ?? \"\").trim().toLowerCase();\n  if (plan) {\n    // treat free / trial / basic as NOT subscribed\n    if ([\"free\", \"trial\", \"basic\"].includes(plan)) return false;\n    return true;\n  }\n\n  // default if not found\n  return false;\n}\n\n// Build normalized entry\nfunction makeEntry(r) {\n  const isSubscribed = getIsSubscribed(r);\n\n  return {\n    name: String(\n      r.customerName ??\n      r.companyName ??\n      r.name ??\n      r.fullName ??\n      \"Unknown\"\n    ),\n    email: String(r.email ?? \"\"),\n    days: toInt(r.daysFromCreation ?? r.daysFromRegistration, 0),\n    isSubscribed,\n    plan: String(r.plan ?? r.subscriptionPlan ?? r.planName ?? (isSubscribed ? \"Paid\" : \"Free\")),\n    createdAt: String(r.createdAt ?? r.creationDate ?? r.registrationDate ?? \"\")\n  };\n}\n\nconst all = rows.map(makeEntry);\n\n// Buckets\nconst b1 = [];          // day 1\nconst b7_free = [];     // day 7 and not subscribed\nconst b14_free = [];    // day 14 and not subscribed\nconst b30_free = [];    // day 30 and not subscribed\n\nfor (const e of all) {\n  if (e.days === 1) b1.push(e);\n  if (e.days === 7 && !e.isSubscribed) b7_free.push(e);\n  if (e.days === 14 && !e.isSubscribed) b14_free.push(e);\n  if (e.days === 30 && !e.isSubscribed) b30_free.push(e);\n}\n\n// Sort\nb1.sort(sortByName);\nb7_free.sort(sortByName);\nb14_free.sort(sortByName);\nb30_free.sort(sortByName);\n\n// KPI totals\nconst totalScanned = all.length;\nconst totalMatched = b1.length + b7_free.length + b14_free.length + b30_free.length;\nconst totalFreeMatched = b7_free.length + b14_free.length + b30_free.length;\n\n// Timestamp\nconst generatedAt = new Date().toISOString().replace(\"T\", \" \").slice(0, 19) + \" UTC\";\n\n// ---------- render ----------\nfunction kpiCard(label, value) {\n  return `\n  <td style=\"width:25%;padding:6px;\">\n    <div style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;\">\n      <div style=\"font-size:12px;line-height:16px;color:#6b7280;margin-bottom:6px;\">${esc(label)}</div>\n      <div style=\"font-size:22px;line-height:26px;font-weight:800;color:#111827;\">${esc(value)}</div>\n    </div>\n  </td>`;\n}\n\nfunction renderTable(items, emptyText) {\n  if (!items.length) {\n    return `<div style=\"color:#6b7280;font-size:13px;line-height:18px;\">${esc(emptyText)}</div>`;\n  }\n\n  const rowsHtml = items.map((e) => {\n    const name = esc(e.name);\n    const email = esc(e.email);\n    const days = esc(e.days);\n    const plan = esc(e.plan);\n    const sub = e.isSubscribed ? \"Yes\" : \"No\";\n\n    return `\n      <tr>\n        <td style=\"padding:10px 10px;border-top:1px solid #eef2f7;font-size:13px;color:#111827;\">\n          <div style=\"font-weight:700;\">${name}</div>\n          ${email ? `<div style=\"color:#6b7280;font-size:12px;margin-top:2px;\">${email}</div>` : ``}\n        </td>\n        <td align=\"center\" style=\"padding:10px 10px;border-top:1px solid #eef2f7;font-size:13px;color:#111827;\">${days}</td>\n        <td align=\"center\" style=\"padding:10px 10px;border-top:1px solid #eef2f7;font-size:13px;color:#111827;\">${esc(sub)}</td>\n        <td align=\"center\" style=\"padding:10px 10px;border-top:1px solid #eef2f7;font-size:13px;color:#111827;\">${plan}</td>\n      </tr>`;\n  }).join(\"\");\n\n  return `\n    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n           style=\"border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;\">\n      <tr style=\"background:#f8fafc;\">\n        <th align=\"left\" style=\"padding:10px 10px;font-size:12px;color:#6b7280;font-weight:700;\">Customer</th>\n        <th align=\"center\" style=\"padding:10px 10px;font-size:12px;color:#6b7280;font-weight:700;\">Days</th>\n        <th align=\"center\" style=\"padding:10px 10px;font-size:12px;color:#6b7280;font-weight:700;\">Subscribed</th>\n        <th align=\"center\" style=\"padding:10px 10px;font-size:12px;color:#6b7280;font-weight:700;\">Plan</th>\n      </tr>\n      ${rowsHtml}\n    </table>`;\n}\n\nfunction sectionCard(title, subtitle, items, emptyText) {\n  return `\n  <div style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 14px;margin-top:14px;\">\n    <div style=\"display:flex;align-items:flex-end;justify-content:space-between;gap:10px;\">\n      <div>\n        <div style=\"font-size:15px;line-height:20px;font-weight:800;color:#111827;\">${esc(title)} <span style=\"color:#2563eb;\">(${items.length})</span></div>\n        <div style=\"font-size:12.5px;line-height:18px;color:#6b7280;margin-top:4px;\">${esc(subtitle)}</div>\n      </div>\n    </div>\n    <div style=\"margin-top:12px;\">\n      ${renderTable(items, emptyText)}\n    </div>\n  </div>`;\n}\n\nconst subject = `SolveStack • Automation Customer Report (${generatedAt})`;\n\nconst body = `<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\" />\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />\n  <meta name=\"x-apple-disable-message-reformatting\" />\n  <meta name=\"format-detection\" content=\"telephone=no,address=no,email=no,date=no,url=no\" />\n  <title>${esc(subject)}</title>\n</head>\n\n<body style=\"margin:0;padding:0;background:#f3f4f6;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"background:#f3f4f6;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n        <table role=\"presentation\" width=\"720\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"\n               style=\"width:720px;max-width:720px;background:#ffffff;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;box-shadow:0 8px 22px rgba(0,0,0,0.06);\">\n\n          <!-- Top bar -->\n          <tr>\n            <td style=\"height:6px;background:#2563eb;line-height:6px;font-size:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- Header -->\n          <tr>\n            <td style=\"padding:18px 20px;background:#ffffff;\">\n              <div style=\"font-size:12px;color:#6b7280;letter-spacing:0.2px;\">SolveStack Operations</div>\n              <div style=\"font-size:20px;line-height:26px;font-weight:900;color:#111827;margin-top:6px;\">\n                Customer Cohorts Report\n              </div>\n              <div style=\"font-size:12.5px;line-height:18px;color:#6b7280;margin-top:6px;\">\n                Generated: ${esc(generatedAt)}\n              </div>\n            </td>\n          </tr>\n\n          <!-- KPI strip -->\n          <tr>\n            <td style=\"padding:0 14px 16px 14px;background:#ffffff;\">\n              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"border-collapse:collapse;\">\n                <tr>\n                  ${kpiCard(\"Customers scanned\", totalScanned)}\n                  ${kpiCard(\"Matched rules (sum)\", totalMatched)}\n                  ${kpiCard(\"Free-plan matches\", totalFreeMatched)}\n                  ${kpiCard(\"Day 7 • Free plan\", b7_free.length)}\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Content -->\n          <tr>\n            <td style=\"padding:0 14px 18px 14px;background:#f8fafc;\">\n\n              ${sectionCard(\n                \"1 day after registration\",\n                \"New customer cohort (daysFromCreation = 1).\",\n                b1,\n                \"No customers matched day 1 today.\"\n              )}\n\n              ${sectionCard(\n                \"1 week after registration • Free plan\",\n                \"Follow-up cohort (daysFromCreation = 7 AND not subscribed).\",\n                b7_free,\n                \"No customers matched day 7 / free-plan today.\"\n              )}\n\n              ${sectionCard(\n                \"2 weeks after registration • Free plan\",\n                \"Follow-up cohort (daysFromCreation = 14 AND not subscribed).\",\n                b14_free,\n                \"No customers matched day 14 / free-plan today.\"\n              )}\n\n              ${sectionCard(\n                \"1 month after registration • Free plan\",\n                \"Follow-up cohort (daysFromCreation = 30 AND not subscribed).\",\n                b30_free,\n                \"No customers matched day 30 / free-plan today.\"\n              )}\n\n              <div style=\"margin-top:14px;font-size:12px;line-height:18px;color:#6b7280;padding:0 4px;\">\n                Tip: If counts look off, verify that <b>daysFromCreation</b> is calculated using date-only logic rather than full timestamp logic.\n              </div>\n\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"padding:16px 20px;background:#ffffff;border-top:1px solid #eef2f7;\">\n              <div style=\"font-size:12px;line-height:18px;color:#6b7280;\">\n                Internal report for customer automation monitoring.\n              </div>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nreturn [{\n  json: {\n    subject,\n    body\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        -80
+      ],
+      "id": "5097c561-254f-45f2-923a-941ceaecafb4",
+      "name": "Report _Email (daily)",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\nconst b1 = [];\nconst b7 = [];\nconst b14 = [];\nconst b30 = [];\n\nfor (const r of rows) {\n  const days = Number(r.daysFromCreation ?? 0);\n  const isSubscribed = r.isSubscribed === true;\n\n  if (days === 1) b1.push(r);\n  if (days === 7 && !isSubscribed) b7.push(r);\n  if (days === 14 && !isSubscribed) b14.push(r);\n  if (days === 30 && !isSubscribed) b30.push(r);\n}\n\nfunction line(items) {\n  if (!items.length) return \"• None\";\n  return items.map(r =>\n    `• ${r.customerName ?? \"Unknown\"} — ${r.email ?? \"no email\"}`\n  ).join(\"\\n\");\n}\n\nconst message = `*SolveStack Daily Customer Report*\nGenerated: ${new Date().toISOString()}\n\n*Summary*\n• Customers scanned: ${rows.length}\n• Day 1: ${b1.length}\n• Day 7 free: ${b7.length}\n• Day 14 free: ${b14.length}\n• Day 30 free: ${b30.length}\n\n*Day 1 customers*\n${line(b1)}\n\n*Day 7 free-plan customers*\n${line(b7)}\n\n*Day 14 free-plan customers*\n${line(b14)}\n\n*Day 30 free-plan customers*\n${line(b30)}`;\n\nreturn [\n  {\n    json: {\n      text: message\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        -272
+      ],
+      "id": "96902745-ea63-4092-a279-71607421e0e4",
+      "name": "Create text message"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c0cf2bd9-bd9e-4ac7-8000-4f10f18b3983",
+              "name": "token",
+              "value": "<REDACTED>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1728,
+        112
+      ],
+      "id": "49ac1ad4-2c0b-4ae7-9ac7-4f8ba217193f",
+      "name": "Set Token",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "<SLACK_ID>",
+          "mode": "list",
+          "cachedResultName": "alerts-channel"
+        },
+        "text": "=A New customer ( {{ $json.name }} ) with email: {{ $json.email }} is registered to SolveStack.ai. Please check the platform for the details",
+        "otherOptions": {
+          "includeLinkToWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -432,
+        96
+      ],
+      "id": "20853c22-659a-4a90-bccc-2638dd8e16cf",
+      "name": "Send_message (Production)",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "executeOnce": true,
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "<SLACK_ID>",
+          "mode": "list",
+          "cachedResultName": "testing-channel"
+        },
+        "text": "=Notifications for customer actions  - n8n flow daily run completed",
+        "otherOptions": {
+          "includeLinkToWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        64,
+        -272
+      ],
+      "id": "c36f87fd-15cb-4b5e-a382-70acaf54f91f",
+      "name": "Send_message (testing)",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "<your slackApi>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2000,
+        112
+      ],
+      "id": "24ed08b0-8265-4c49-9a7c-99d46e281ddb",
+      "name": "Schedule Trigger",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "<Sender Name> <user@example.com>",
+        "toEmail": "user@example.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        80,
+        -80
+      ],
+      "id": "0a8c1b09-74b8-470d-b9e1-c1d128946220",
+      "name": "Send an Email",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "<your smtp>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "<Sender Name> <user@example.com>",
+        "toEmail": "user@example.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        864,
+        576
+      ],
+      "id": "063e50c3-c996-4e08-b5ba-c8fa169da93a",
+      "name": "Send an EmailTest",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "<your smtp>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "<Sender Name> <user@example.com>",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "bccEmail": "user@example.com,user@example.com"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        384,
+        320
+      ],
+      "id": "b5315a9c-1b2f-4aa4-a4e7-07e800d03153",
+      "name": "Send an Email-welcome1",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "<your smtp>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "<Sender Name> <user@example.com>",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "bccEmail": "user@example.com,user@example.com"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        416,
+        480
+      ],
+      "id": "0ba2110f-5cec-4f11-bd5d-94a95ac81eaa",
+      "name": "Send an Email - 1 week",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "<your smtp>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "<Sender Name> <user@example.com>",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "bccEmail": "user@example.com,user@example.com"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        368,
+        768
+      ],
+      "id": "c1bafeb9-3a55-4bca-bf1f-d75217622a94",
+      "name": "Send an Email - 2 weeks",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "<your smtp>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "<Sender Name> <user@example.com>",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "bccEmail": "user@example.com,user@example.com"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        1312
+      ],
+      "id": "2196fa24-0a76-47b9-a3a9-0b978c70dd41",
+      "name": "Send an Email - 1 month",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "<your smtp>"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "baseUrl",
+              "id": "baseUrl",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "program",
+              "id": "program",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "campaign",
+              "id": "campaign",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content",
+              "id": "content",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "term",
+              "id": "term",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "baseUrl": "https://solvestack.ai/",
+            "campaign": "customer_welcome",
+            "content": "",
+            "program": "lifecycle",
+            "term": ""
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ae62b18e-9e7b-459e-9501-39589076969e",
+      "name": "Build Link (Welcome)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -336,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "baseUrl",
+              "id": "baseUrl",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "program",
+              "id": "program",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "campaign",
+              "id": "campaign",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content",
+              "id": "content",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "term",
+              "id": "term",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "baseUrl": "https://solvestack.ai/",
+            "campaign": "customer_reminder_1w",
+            "content": "",
+            "program": "lifecycle",
+            "term": ""
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "bef6ec9a-1ad7-4e62-befd-5702125e0d2b",
+      "name": "Build Link (1 week)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "baseUrl",
+              "id": "baseUrl",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "program",
+              "id": "program",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "campaign",
+              "id": "campaign",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content",
+              "id": "content",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "term",
+              "id": "term",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "baseUrl": "https://solvestack.ai/",
+            "campaign": "customer_reminder_2w",
+            "content": "",
+            "program": "lifecycle",
+            "term": ""
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ccdecef0-2d2e-4c4c-8676-579fe036916d",
+      "name": "Build Link (2 weeks)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<WORKFLOW_ID>"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "baseUrl",
+              "id": "baseUrl",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "program",
+              "id": "program",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "campaign",
+              "id": "campaign",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "content",
+              "id": "content",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "term",
+              "id": "term",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "baseUrl": "https://solvestack.ai/",
+            "campaign": "customer_reminder_1m",
+            "content": "",
+            "program": "lifecycle",
+            "term": ""
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "7f7eded7-29ae-456b-b087-19b9d94f69a8",
+      "name": "Build Link (1 month)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        1152
+      ]
+    }
+  ],
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send_message (Production)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Link (Welcome)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare_Email (Welcome)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Link (1 week)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare_Email (1 week)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Link (2 weeks)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare_Email (2 weeks)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Link (1 month)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare_Email (1 month)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all customers": {
+      "main": [
+        [
+          {
+            "node": "Set creation date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare_Email (Welcome)": {
+      "main": [
+        [
+          {
+            "node": "Send an EmailTest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send an Email-welcome1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set creation date": {
+      "main": [
+        [
+          {
+            "node": "Calculate daysFromcreation and plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate daysFromcreation and plan": {
+      "main": [
+        [
+          {
+            "node": "Report _Email (daily)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare_Email (2 weeks)": {
+      "main": [
+        [
+          {
+            "node": "Send an EmailTest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send an Email - 2 weeks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare_Email (1 month)": {
+      "main": [
+        [
+          {
+            "node": "Send an EmailTest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send an Email - 1 month",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare_Email (1 week)": {
+      "main": [
+        [
+          {
+            "node": "Send an EmailTest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send an Email - 1 week",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initiated after login": {
+      "main": [
+        []
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Report _Email (daily)": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create text message": {
+      "main": [
+        [
+          {
+            "node": "Send_message (testing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Token": {
+      "main": [
+        [
+          {
+            "node": "Get all customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "tags": []
+}

@@ -1,0 +1,188 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "UTM Link Builder",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "baseUrl"
+            },
+            {
+              "name": "program"
+            },
+            {
+              "name": "campaign"
+            },
+            {
+              "name": "content"
+            },
+            {
+              "name": "term"
+            }
+          ]
+        }
+      },
+      "id": "610bbef0-a298-42bd-b018-03778dd4d683",
+      "name": "UTM Link Builder Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<DATA_TABLE_ID>"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "program",
+              "keyValue": "={{ $json.program }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "6749cd5f-eb73-40de-ba67-2763afee16ea",
+      "name": "Lookup Program in utm_taxonomy",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.utmSource }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c85f2c5c-f015-4785-b0ec-dd71b7e5286c",
+      "name": "Program Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const triggerData = $(\"UTM Link Builder Trigger\").item.json;\nconst taxonomyRow = $json;\n\nfunction norm(value) {\n  return (value === null || value === undefined) ? \"\" : String(value).trim().toLowerCase();\n}\n\nconst baseUrl = triggerData.baseUrl;\nconst program = norm(triggerData.program);\nconst campaign = norm(triggerData.campaign);\nconst content = norm(triggerData.content);\nconst term = norm(triggerData.term);\n\nconst utmSource = norm(taxonomyRow.utmSource);\nconst utmMedium = norm(taxonomyRow.utmMedium);\nconst campaignType = norm(taxonomyRow.campaignType);\n\nif (!baseUrl || !/^https?:\\/\\//i.test(baseUrl)) {\n  return [{ json: { success: false, error: \"Missing or invalid baseUrl (must start with http:// or https://): \" + baseUrl, program: program } }];\n}\n\nif (!campaign) {\n  return [{ json: { success: false, error: \"Missing campaign for program \\\"\" + program + \"\\\"\", program: program } }];\n}\n\nif (campaignType === \"event\") {\n  const eventPattern = /^\\d{4}-\\d{2}(-\\d{2})?_?/;\n  if (!eventPattern.test(campaign)) {\n    return [{ json: { success: false, error: \"Event-type campaign \\\"\" + campaign + \"\\\" should start with YYYY-MM or YYYY-MM-DD\", program: program } }];\n  }\n}\n\nconst params = [];\nparams.push(\"utm_source=\" + encodeURIComponent(utmSource));\nparams.push(\"utm_medium=\" + encodeURIComponent(utmMedium));\nparams.push(\"utm_campaign=\" + encodeURIComponent(campaign));\nif (content) {\n  params.push(\"utm_content=\" + encodeURIComponent(content));\n}\nif (term) {\n  params.push(\"utm_term=\" + encodeURIComponent(term));\n}\nconst queryString = params.join(\"&\");\nconst separator = baseUrl.indexOf(\"?\") === -1 ? \"?\" : \"&\";\nconst finalUrl = baseUrl + separator + queryString;\n\nreturn [{\n  json: {\n    success: true,\n    url: finalUrl,\n    program: program,\n    utmSource: utmSource,\n    utmMedium: utmMedium,\n    utmCampaign: campaign,\n    utmContent: content || null\n  }\n}];"
+      },
+      "id": "0940aff2-2a07-47ba-9992-b584a779e8a7",
+      "name": "Build Tagged URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const triggerData = $(\"UTM Link Builder Trigger\").item.json;\nconst program = triggerData.program;\n\nreturn [{\n  json: {\n    success: false,\n    error: \"Unknown program \\\"\" + program + \"\\\" \\u2014 not found in utm_taxonomy data table. Add it there before using it.\",\n    program: program\n  }\n}];"
+      },
+      "id": "e287306f-c8ac-4ef6-bbf4-28f15566fd99",
+      "name": "Return Unknown Program Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## UTM Link Builder\\n\\nCalled via Execute Workflow from any email-sending workflow.\\n\\nInputs: baseUrl, program (lifecycle/newsletter/demo-day/campaign), campaign, content (optional), term (optional).\\n\\nLooks up program in the utm_taxonomy data table for the correct utm_source/utm_medium, validates campaign naming, and returns { success, url } or { success: false, error }.",
+        "height": 576,
+        "width": 1140,
+        "color": 4
+      },
+      "id": "12002d42-eb85-4dc1-b486-f8106f0c35e5",
+      "name": "Sticky Note 0f90056d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -256
+      ]
+    }
+  ],
+  "connections": {
+    "UTM Link Builder Trigger": {
+      "main": [
+        [
+          {
+            "node": "Lookup Program in utm_taxonomy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Program in utm_taxonomy": {
+      "main": [
+        [
+          {
+            "node": "Program Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Program Found?": {
+      "main": [
+        [
+          {
+            "node": "Build Tagged URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Unknown Program Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

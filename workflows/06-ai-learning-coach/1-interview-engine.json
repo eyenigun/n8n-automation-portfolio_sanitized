@@ -1,0 +1,955 @@
+{
+  "id": "<WORKFLOW_ID>",
+  "name": "1_Interview Engine",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/slack-interview",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -656,
+        -800
+      ],
+      "id": "878eeac0-56a1-44ed-a781-dd7a1f92d0f0",
+      "name": "Webhook",
+      "webhookId": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Starting interview.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -432,
+        -800
+      ],
+      "id": "482f508d-5a42-431b-ac0d-4fb5915c4ac8",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        -320
+      ],
+      "id": "247655a8-7918-4f05-82bb-15b010e8dbd0",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "content": "Workflow 1 - Start Interview"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        -880
+      ],
+      "id": "78d804f1-a474-4525-a245-4fb7da885ae9",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "interviews"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "thread_ts",
+              "keyValue": "={{ $('When Executed by Another Workflow').item.json.thread_ts }}"
+            }
+          ]
+        },
+        "limit": 10
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        -240
+      ],
+      "id": "37fbf865-246f-47ee-8699-b9b224394820",
+      "name": "Get Interview",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        336,
+        -416
+      ],
+      "id": "8091a986-4f7c-4d13-848f-648ff5439280",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "interviews"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "={{ $json.body.channel_id }}",
+            "user": "={{ $('Webhook').item.json.body.user_id }}",
+            "status": "in_progress",
+            "currentQuestion": 1,
+            "currentQuestionKey": "What is your current job title and what are your main responsibilities?",
+            "answers": "{}",
+            "thread_ts": "={{ $json.message.ts }}",
+            "interviewId": "={{ Date.now().toString() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "currentQuestion",
+              "displayName": "currentQuestion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "currentQuestionKey",
+              "displayName": "currentQuestionKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "answers",
+              "displayName": "answers",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "roadmap",
+              "displayName": "roadmap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "interviewId",
+              "displayName": "interviewId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        -800
+      ],
+      "id": "0fed2d86-a5b5-4555-97a4-313ef04a3f35",
+      "name": "Create interview"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a375c2e4-027e-48a3-96c6-95241189dd36",
+              "name": "thread_ts",
+              "value": "={{ $json.thread_ts }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -112,
+        -240
+      ],
+      "id": "291770ba-9205-474e-9c09-9190a8fb5bc8",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "interviews"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "interviewId",
+              "keyValue": "={{$json.interviewId}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        -416
+      ],
+      "id": "8bd74b4b-379c-4a4e-8604-2eb5e3798ce1",
+      "name": "Get interviewID"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        -80
+      ],
+      "id": "dd02ce21-c141-473b-83d9-6a568d308be8",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "interview_answers"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "interviewId": "={{ $json.interviewId }}",
+            "questionNumber": "={{ $json.currentQuestion }}",
+            "questionKey": "={{$json.currentQuestionKey}}",
+            "answer": "={{ $json.text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "interviewId",
+              "displayName": "interviewId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "questionNumber",
+              "displayName": "questionNumber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "questionKey",
+              "displayName": "questionKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "answer",
+              "displayName": "answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        -416
+      ],
+      "id": "e91da95e-2628-4ac8-be96-ff40bd09aa74",
+      "name": "Create interview_answers row"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "interviews"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "interviewId",
+              "keyValue": "={{$json.interviewId}}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "currentQuestion": "={{ Number($json.currentQuestion) + 1 }}",
+            "currentQuestionKey": "={{ $node[\"Get Question in text\"].json.question }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "interviewId",
+              "displayName": "interviewId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "answers",
+              "displayName": "answers",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "currentQuestion",
+              "displayName": "currentQuestion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "roadmap",
+              "displayName": "roadmap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "currentQuestionKey",
+              "displayName": "currentQuestionKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1232,
+        -320
+      ],
+      "id": "75b55f2b-6e16-45dd-8a60-02c1aeb62706",
+      "name": "Update Interview"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "<DATA_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "interview_questions"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "questionNumber",
+              "keyValue": "={{ Number($json.currentQuestion) + 1 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        -192
+      ],
+      "id": "7341e2cd-8c54-40f0-8dbd-03986ea7d411",
+      "name": "Get Question in text"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1008,
+        -320
+      ],
+      "id": "cc876fe2-cccf-4737-9cbe-e1e859dfe6f6",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "33664368-5695-4959-b57f-ee45f525255c",
+              "leftValue": "={{ $json.currentQuestion }}",
+              "rightValue": 11,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1456,
+        -240
+      ],
+      "id": "3c4ef06b-c219-4e52-b0ba-5e819e38bdc2",
+      "name": "If Interview finished"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "eb20d2e5-f984-4c47-8561-8e0d4c831918",
+              "leftValue": "={{$json.thread_ts}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "24fd429d-3c71-4624-9ee2-0f5e8e5a73cd",
+              "leftValue": "={{$json.bot_id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -336,
+        -240
+      ],
+      "id": "965f2e70-357f-4561-93a7-826ec9aca1b6",
+      "name": "If valid case"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "Interview - Ask Question"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        -800
+      ],
+      "id": "1b1f9fd4-d343-4e15-9909-37f4f10edbe8",
+      "name": "Call->Interview - Ask Question_1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "2- Interview - Ask Question"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        -192
+      ],
+      "id": "94822da3-c24c-4611-9ce4-30a6c9f1a5d6",
+      "name": "Call->Interview - Ask Question_2"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "<WORKFLOW_ID>",
+          "mode": "list",
+          "cachedResultName": "3- Interview_Finish"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1904,
+        -416
+      ],
+      "id": "68d126c9-4af8-48c0-9581-20670ccdeb2a",
+      "name": "Call->Finish_Interview"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1680,
+        -416
+      ],
+      "id": "3a5b2464-6d7e-46b9-8be5-977d47fa8646",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "content": "Workflow 2 - Process Answer workflow."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        -368
+      ],
+      "id": "c208cece-e846-499a-8ee1-4a1eaacb1207",
+      "name": "Sticky Note1"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create interview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If valid case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Interview": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Get Question in text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Create interview_answers row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create interview": {
+      "main": [
+        [
+          {
+            "node": "Call->Interview - Ask Question_1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Get Interview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get interviewID": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Create interview_answers row": {
+      "main": [
+        [
+          {
+            "node": "Get interviewID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Interview": {
+      "main": [
+        [
+          {
+            "node": "If Interview finished",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Question in text": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Update Interview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Interview finished": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Call->Interview - Ask Question_2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If valid case": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call->Finish_Interview": {
+      "main": [
+        []
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Call->Finish_Interview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "any"
+  },
+  "tags": []
+}
